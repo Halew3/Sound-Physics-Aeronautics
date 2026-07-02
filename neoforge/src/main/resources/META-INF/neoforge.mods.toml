@@ -1,18 +1,20 @@
 modLoader = "javafml"
 loaderVersion = "*"
 license = "GPL"
-issueTrackerURL = "https://github.com/Halew3/SPR-Aeronautics/issues"
+issueTrackerURL = "https://github.com/Halew3/Sound-Physics-Aeronautics/issues"
 [[mods]]
 modId = "sound_physics_remastered"
 version = "${mod_version}"
 displayName = "${mod_display_name}"
-displayURL = "https://github.com/Halew3/SPR-Aeronautics"
+displayURL = "https://github.com/Halew3/Sound-Physics-Aeronautics"
 logoFile = "icon.png"
 authors = "Sonic Ether, vlad2305m, Max Henkel"
 credits = "Sonic Ether, vlad2305m, Max Henkel; SPR Aeronautics fork by Halew3"
-description = '''Experimental GPLv3 Sound Physics Remastered fork for Minecraft 1.21.1 NeoForge and Sable/Create Aeronautics moving sublevel acoustics.
+description = '''Sound Physics Aeronautics is a NeoForge 1.21.1 fork of Sound Physics Remastered focused on Create Aeronautics and Sable moving sublevels.
 
-This fork keeps modId sound_physics_remastered for now, so it is a drop-in replacement and cannot be installed alongside upstream Sound Physics Remastered. It includes Sable-aware acoustic snapshots plus a manual per-source Doppler layer for alpha verification.'''
+It preserves Sound Physics Remastered-style occlusion, reverb, and absorption while adding moving sublevel acoustic support, long-range Aeronautics propeller audio, Doppler handling for supported moving sources, and safer sound policy behavior for modded Create/Aeronautics packs.
+
+This fork keeps the mod id sound_physics_remastered, so it is a drop-in replacement and cannot be installed alongside upstream Sound Physics Remastered.'''
 displayTest = "IGNORE_ALL_VERSION"
 [[dependencies.sound_physics_remastered]]
 modId = "neoforge"

@@ -61,7 +61,10 @@ tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }
 
-def alphaJarFileName = "sound-physics-aeronautics-neoforge-${minecraft_version}-alpha.1.jar"
+def alphaReleaseVersion = mod_version.startsWith("${minecraft_version}-")
+        ? mod_version.substring("${minecraft_version}-".length())
+        : mod_version
+def alphaJarFileName = "sound-physics-aeronautics-neoforge-${minecraft_version}-${alphaReleaseVersion}-alpha.1.jar"
 
 tasks.register('alphaJar', Copy) {
     group = 'build'

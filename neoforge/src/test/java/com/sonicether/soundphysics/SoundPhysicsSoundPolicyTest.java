@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 
 import com.sonicether.soundphysics.config.SoundPhysicsConfig;
+import com.sonicether.soundphysics.doppler.DopplerSoundPolicy;
 
 import de.maxhenkel.configbuilder.ConfigBuilder;
 import net.minecraft.resources.ResourceLocation;
@@ -78,6 +79,88 @@ class SoundPhysicsSoundPolicyTest {
         )));
         assertTrue(SoundPhysicsSoundPolicy.evaluateAcoustic(config, propeller).apply());
         assertTrue(SoundPhysicsSoundPolicy.evaluateDoppler(config, propeller).apply());
+    }
+
+    @Test
+    void sableDelegatedAeronauticsPropellerDopplerIsAllowedByDefaultPropellerConfig() {
+        SoundPhysicsConfig config = config();
+        config.dopplerApplyToAeronauticsPropellers.set(true);
+        config.dopplerApplyToSableDelegatedSounds.set(false);
+        SoundPhysicsSoundPolicy.SoundContext propeller = sableDelegatedAeronauticsPropeller();
+
+        SoundPhysicsSoundPolicy.Decision decision = SoundPhysicsSoundPolicy.evaluateDoppler(config, propeller);
+
+        assertTrue(decision.apply());
+        assertEquals(SoundPhysicsSoundPolicy.DecisionReason.PROPELLER_ALLOWED, decision.reason());
+    }
+
+    @Test
+    void sableDelegatedAeronauticsPropellerDopplerRequiresPropellerOrDiagnosticPolicy() {
+        SoundPhysicsConfig config = config();
+        config.dopplerApplyToAeronauticsPropellers.set(false);
+        config.dopplerApplyToPositionalAmbientMachinery.set(false);
+        config.dopplerApplyToSableDelegatedSounds.set(false);
+
+        SoundPhysicsSoundPolicy.Decision decision = SoundPhysicsSoundPolicy.evaluateDoppler(
+                config,
+                sableDelegatedAeronauticsPropeller()
+        );
+
+        assertFalse(decision.apply());
+    }
+
+    @Test
+    void genericSableDelegatedNonPropellerDopplerIsSkippedByDefault() {
+        SoundPhysicsConfig config = config();
+        config.dopplerApplyToSableDelegatedSounds.set(false);
+
+        SoundPhysicsSoundPolicy.Decision decision = SoundPhysicsSoundPolicy.evaluateDoppler(
+                config,
+                new SoundPhysicsSoundPolicy.SoundContext(
+                        ResourceLocation.fromNamespaceAndPath("example", "machine.loop"),
+                        SoundSource.BLOCKS,
+                        DopplerSoundPolicy.SABLE_MOVING_SOUND_INSTANCE_DELEGATE,
+                        false,
+                        false,
+                        true,
+                        false,
+                        false
+                )
+        );
+
+        assertFalse(decision.apply());
+        assertEquals(SoundPhysicsSoundPolicy.DecisionReason.SABLE_DELEGATE, decision.reason());
+    }
+
+    @Test
+    void sableDelegatedPropellerSafeModeStillSkipsDoppler() {
+        SoundPhysicsConfig config = config();
+        DiagnosticRuntimeOverrides.enablePropellerSafe();
+
+        SoundPhysicsSoundPolicy.Decision decision = SoundPhysicsSoundPolicy.evaluateDoppler(
+                config,
+                sableDelegatedAeronauticsPropeller()
+        );
+
+        assertFalse(decision.apply());
+        assertEquals(SoundPhysicsSoundPolicy.DecisionReason.PROPELLER_SAFE_MODE, decision.reason());
+    }
+
+    @Test
+    void sableDelegatedPropellerDebugModeStillAllowsDoppler() {
+        SoundPhysicsConfig config = config();
+        config.dopplerApplyToAeronauticsPropellers.set(false);
+        config.dopplerApplyToPositionalAmbientMachinery.set(false);
+        config.dopplerApplyToSableDelegatedSounds.set(false);
+        DiagnosticRuntimeOverrides.enablePropellerDebug();
+
+        SoundPhysicsSoundPolicy.Decision decision = SoundPhysicsSoundPolicy.evaluateDoppler(
+                config,
+                sableDelegatedAeronauticsPropeller()
+        );
+
+        assertTrue(decision.apply());
+        assertEquals(SoundPhysicsSoundPolicy.DecisionReason.PROPELLER_ALLOWED, decision.reason());
     }
 
     @Test
@@ -319,6 +402,19 @@ class SoundPhysicsSoundPolicyTest {
                 noAttenuation,
                 false,
                 startEvent,
+                true
+        );
+    }
+
+    private SoundPhysicsSoundPolicy.SoundContext sableDelegatedAeronauticsPropeller() {
+        return new SoundPhysicsSoundPolicy.SoundContext(
+                SoundPhysicsSoundPolicy.AERONAUTICS_PROPELLER_LARGE,
+                SoundSource.AMBIENT,
+                DopplerSoundPolicy.SABLE_MOVING_SOUND_INSTANCE_DELEGATE,
+                false,
+                false,
+                true,
+                false,
                 true
         );
     }

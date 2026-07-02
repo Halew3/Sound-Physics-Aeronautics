@@ -301,8 +301,8 @@ public class SoundPhysicsConfig {
                 .comment("Logs sound policy decisions for propeller/Crosswind candidates and skipped sounds.");
         dopplerEnabled = builder.booleanEntry("doppler_enabled", true)
                 .comment("Enables pitch shifting based on source/listener relative motion");
-        dopplerStrength = builder.doubleEntry("doppler_strength", 1.0D, 0.0D, 4.0D)
-                .comment("Scales the Doppler effect. 1.0 is physically grounded; higher values are more dramatic");
+        dopplerStrength = builder.doubleEntry("doppler_strength", 2.5D, 0.0D, 4.0D)
+                .comment("Scales the Doppler effect. 1.0 is realistic but boring; higher values are more dramatic");
         dopplerSpeedOfSound = builder.doubleEntry("doppler_speed_of_sound_blocks_per_second", 343.0D, 20.0D, 2000.0D)
                 .comment("Speed of sound used for Doppler calculations, in blocks per second");
         dopplerMinPitchMultiplier = builder.doubleEntry("doppler_min_pitch_multiplier", 0.50D, 0.05D, 4.0D)
@@ -310,7 +310,7 @@ public class SoundPhysicsConfig {
         dopplerMaxPitchMultiplier = builder.doubleEntry("doppler_max_pitch_multiplier", 2.00D, 0.05D, 4.0D)
                 .comment("Maximum Doppler pitch multiplier");
         dopplerUpdateIntervalTicks = builder.integerEntry("doppler_update_interval_ticks", 1, 1, 20)
-                .comment("How often active sound pitch is updated. This does not trigger full acoustic ray reevaluation");
+                .comment("How often active sound pitch is updated.");
         dopplerSmoothingTimeMs = builder.integerEntry("doppler_smoothing_time_ms", 100, 0, 2000)
                 .comment("Exponential smoothing time for Doppler pitch changes, in milliseconds");
         dopplerApplyToBlockSounds = builder.booleanEntry("doppler_apply_to_block_sounds", true)

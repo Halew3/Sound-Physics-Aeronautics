@@ -444,7 +444,7 @@ final class NeoForgeDiagnosticsCommand {
         DiagnosticRuntimeOverrides.enablePropellerDebug();
         applyRuntimeMode();
         send(source, "SPR Aeronautics mode set to propeller_debug");
-        send(source, "propeller_debug enables SPR acoustic processing for known propellers with safety exemptions and verbose diagnostics. Expected: muffling/reverb should work; Doppler remains diagnostic/experimental.");
+        send(source, "propeller_debug enables diagnostic overrides for known propellers. Release defaults should already allow Aeronautics propeller Doppler when doppler_apply_to_aeronautics_propellers=true.");
         send(source, "Config: " + ConfigDiagnostics.criticalValuesSummary());
         return Command.SINGLE_SUCCESS;
     }
@@ -605,7 +605,8 @@ final class NeoForgeDiagnosticsCommand {
         SoundPhysicsPolicyDiagnostics.reset();
         SoundPhysicsPerfDiagnostics.reset();
         DopplerEngine.resetDiagnostics();
-        send(source, "SPR Aeronautics preset propeller_test applied: logging quiet, ray filter propeller, mode propeller_debug, propeller/Doppler diagnostics reset.");
+        send(source, "SPR Aeronautics preset propeller_test applied: diagnostic override mode propeller_debug, logging quiet, ray filter propeller, propeller/Doppler diagnostics reset.");
+        send(source, "Release defaults should already allow Aeronautics propeller Doppler without this preset when doppler_apply_to_aeronautics_propellers=true.");
         send(source, "Next: /spr_aero propeller sources");
         send(source, "Next: /spr_aero doppler force_multiplier propeller 1.5 5");
         send(source, "Next: /spr_aero doppler sources propeller");

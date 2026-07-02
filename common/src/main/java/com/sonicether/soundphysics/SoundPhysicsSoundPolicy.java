@@ -323,12 +323,15 @@ public final class SoundPhysicsSoundPolicy {
         if (context.noAttenuation()) {
             return Decision.skip(context.startEvent() ? DecisionReason.PROPELLER_START_DEFERRED : DecisionReason.PROPELLER_SKIPPED_NO_ATTENUATION);
         }
+        boolean aeronauticsPropellerAllowed =
+                isAeronauticsPropeller(context) && config.dopplerApplyToAeronauticsPropellers.get();
         if (isSableDelegated(context)
+                && !aeronauticsPropellerAllowed
                 && !DiagnosticRuntimeOverrides.propellerDebugMode()
                 && !config.dopplerApplyToSableDelegatedSounds.get()) {
             return Decision.skip(DecisionReason.PROPELLER_SKIPPED_SABLE_DELEGATE);
         }
-        if (config.dopplerApplyToAeronauticsPropellers.get()
+        if (aeronauticsPropellerAllowed
                 || config.dopplerApplyToPositionalAmbientMachinery.get()
                 || DiagnosticRuntimeOverrides.propellerDebugMode()) {
             return Decision.apply(DecisionReason.PROPELLER_ALLOWED);
