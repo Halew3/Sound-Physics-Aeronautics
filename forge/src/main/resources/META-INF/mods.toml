@@ -1,0 +1,38 @@
+modLoader = "javafml"
+loaderVersion = "*"
+license = "GPL"
+issueTrackerURL = "https://github.com/Halew3/SPR-Aeronautics/issues"
+[[mods]]
+modId = "sound_physics_remastered"
+version = "${mod_version}"
+displayName = "Sound Physics Aeronautics (unsupported Forge source)"
+displayURL = "https://github.com/Halew3/SPR-Aeronautics"
+logoFile = "icon.png"
+authors = "Sonic Ether, vlad2305m, Max Henkel, Saint, Halew3"
+credits = "Sonic Ether, vlad2305m, Max Henkel; SPR Aeronautics fork by Halew3"
+description = '''Inherited Forge source for the Sound Physics Aeronautics fork. Public alpha releases target NeoForge 1.21.1 only.'''
+displayTest = "IGNORE_ALL_VERSION"
+[[dependencies.sound_physics_remastered]]
+modId = "forge"
+mandatory = true
+versionRange = "${forge_dependency}"
+ordering = "NONE"
+side = "BOTH"
+[[dependencies.sound_physics_remastered]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.21,1.21.1]"
+ordering = "NONE"
+side = "BOTH"
+[[dependencies.sound_physics_remastered]]
+modId = "cloth_config"
+mandatory = false
+versionRange = "[${cloth_config_version},)"
+ordering = "AFTER"
+side = "BOTH"
+[[dependencies.sound_physics_remastered]]
+modId = "voicechat"
+mandatory = false
+versionRange = "[1.21-2.3.0,)"
+ordering = "AFTER"
+side = "BOTH"

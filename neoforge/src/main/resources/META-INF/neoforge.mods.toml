@@ -1,0 +1,46 @@
+modLoader = "javafml"
+loaderVersion = "*"
+license = "GPL"
+issueTrackerURL = "https://github.com/Halew3/SPR-Aeronautics/issues"
+[[mods]]
+modId = "sound_physics_remastered"
+version = "${mod_version}"
+displayName = "${mod_display_name}"
+displayURL = "https://github.com/Halew3/SPR-Aeronautics"
+logoFile = "icon.png"
+authors = "Sonic Ether, vlad2305m, Max Henkel"
+credits = "Sonic Ether, vlad2305m, Max Henkel; SPR Aeronautics fork by Halew3"
+description = '''Experimental GPLv3 Sound Physics Remastered fork for Minecraft 1.21.1 NeoForge and Sable/Create Aeronautics moving sublevel acoustics.
+
+This fork keeps modId sound_physics_remastered for now, so it is a drop-in replacement and cannot be installed alongside upstream Sound Physics Remastered. It includes Sable-aware acoustic snapshots plus a manual per-source Doppler layer for alpha verification.'''
+displayTest = "IGNORE_ALL_VERSION"
+[[dependencies.sound_physics_remastered]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neoforge_dependency}"
+ordering = "NONE"
+side = "BOTH"
+[[dependencies.sound_physics_remastered]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21,1.21.1]"
+ordering = "NONE"
+side = "BOTH"
+[[dependencies.sound_physics_remastered]]
+modId = "cloth_config"
+type = "optional"
+versionRange = "[${cloth_config_version},)"
+ordering = "AFTER"
+side = "BOTH"
+[[dependencies.sound_physics_remastered]]
+modId = "voicechat"
+type = "optional"
+versionRange = "[1.21-2.3.0,)"
+ordering = "AFTER"
+side = "BOTH"
+[[dependencies.sound_physics_remastered]]
+modId = "sable"
+type = "optional"
+versionRange = "${sable_mod_version_range}"
+ordering = "AFTER"
+side = "BOTH"
