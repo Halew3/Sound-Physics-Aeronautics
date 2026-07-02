@@ -2,7 +2,7 @@
 
 **Sound Physics Aeronautics** is a fork of [Sound Physics Remastered](https://github.com/henkelmax/sound-physics-remastered) built around **Create Aeronautics** and **Sable** moving sublevel acoustics.
 
-Extends Sound Physics so that sublevels are no longer ignored. In short, your Create Aeronautics creations are missing sound physics. Sound Physics Aeronautics fixes that.
+Extends Sound Physics so that sublevels are no longer ignored. In short, your Create Aeronautics creations are missing sound physics. SPR: Aeronautics fixes that.
 
 ---
 
@@ -34,7 +34,7 @@ Compatibility with other propulsion sounds from addons like Create: Propulsion i
 
 ---
 
-### Doppler Audio for Moving Sources
+### Doppler Effect for Moving Sources
 
 SPR Aeronautics adds a Doppler effect for positional sound sources, fully configurable.
 

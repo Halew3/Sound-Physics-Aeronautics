@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
@@ -59,9 +60,46 @@ class BlockSoundDefaultsTest {
     void curatedResourceDefaultsArePackaged() throws IOException {
         Properties reflectivityProperties = loadResourceProperties(ReflectivityConfig.CREATE_AERONAUTICS_DEFAULTS_RESOURCE);
         Properties occlusionProperties = loadResourceProperties(OcclusionConfig.CREATE_AERONAUTICS_DEFAULTS_RESOURCE);
+        Properties v3ReflectivityProperties = loadResourceProperties(ReflectivityConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
+        Properties v3OcclusionProperties = loadResourceProperties(OcclusionConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
 
         assertEquals(84, reflectivityProperties.stringPropertyNames().size());
         assertEquals(84, occlusionProperties.stringPropertyNames().size());
+        assertEquals(680, v3ReflectivityProperties.stringPropertyNames().size());
+        assertEquals(680, v3OcclusionProperties.stringPropertyNames().size());
+    }
+
+    @Test
+    void v3DefaultsDoNotOverlapCreateAeronauticsDefaults() throws IOException {
+        Properties createReflectivityProperties = loadResourceProperties(ReflectivityConfig.CREATE_AERONAUTICS_DEFAULTS_RESOURCE);
+        Properties createOcclusionProperties = loadResourceProperties(OcclusionConfig.CREATE_AERONAUTICS_DEFAULTS_RESOURCE);
+        Properties v3ReflectivityProperties = loadResourceProperties(ReflectivityConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
+        Properties v3OcclusionProperties = loadResourceProperties(OcclusionConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
+
+        Set<String> createReflectivityKeys = createReflectivityProperties.stringPropertyNames();
+        Set<String> createOcclusionKeys = createOcclusionProperties.stringPropertyNames();
+
+        assertEquals(0, v3ReflectivityProperties.stringPropertyNames().stream()
+                .filter(createReflectivityKeys::contains)
+                .count());
+        assertEquals(0, v3OcclusionProperties.stringPropertyNames().stream()
+                .filter(createOcclusionKeys::contains)
+                .count());
+    }
+
+    @Test
+    void v3CommentedCandidatesRemainInactive() throws IOException {
+        String reflectivityText = loadResourceText(ReflectivityConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
+        String occlusionText = loadResourceText(OcclusionConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
+        Properties reflectivityProperties = loadResourceProperties(ReflectivityConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
+        Properties occlusionProperties = loadResourceProperties(OcclusionConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
+
+        assertEquals(8, countCommentedCandidates(reflectivityText));
+        assertEquals(8, countCommentedCandidates(occlusionText));
+        assertFalse(reflectivityProperties.containsKey("create_connected:copycat_beam"));
+        assertFalse(reflectivityProperties.containsKey("the_bumblezone:pollen_puff"));
+        assertFalse(occlusionProperties.containsKey("create_connected:copycat_beam"));
+        assertFalse(occlusionProperties.containsKey("the_bumblezone:pollen_puff"));
     }
 
     @Test
@@ -83,8 +121,13 @@ class BlockSoundDefaultsTest {
         ReflectivityConfig reflectivityConfig = new ReflectivityConfig(tempDir.resolve("reflectivity.properties"));
         OcclusionConfig occlusionConfig = new OcclusionConfig(tempDir.resolve("occlusion.properties"));
 
-        assertFalse(byConfigString(reflectivityConfig.getBlockDefinitions()).containsKey("minecraft:air"));
-        assertFalse(byConfigString(occlusionConfig.getBlockDefinitions()).containsKey("minecraft:air"));
+        Map<String, Float> reflectivity = byConfigString(reflectivityConfig.getBlockDefinitions());
+        Map<String, Float> occlusion = byConfigString(occlusionConfig.getBlockDefinitions());
+
+        assertFalse(reflectivity.containsKey("minecraft:air"));
+        assertFalse(occlusion.containsKey("minecraft:air"));
+        assertFalse(reflectivity.containsKey("aether:aerogel"));
+        assertFalse(occlusion.containsKey("aether:aerogel"));
     }
 
     private Properties loadResourceProperties(String resourcePath) throws IOException {
@@ -94,6 +137,19 @@ class BlockSoundDefaultsTest {
             properties.load(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
         }
         return properties;
+    }
+
+    private String loadResourceText(String resourcePath) throws IOException {
+        try (InputStream inputStream = BlockSoundDefaultsTest.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            assertNotNull(inputStream, "Missing resource " + resourcePath);
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private long countCommentedCandidates(String text) {
+        return text.lines()
+                .filter(line -> line.matches("^#\\s+[^#].*\\\\:.*=.*$"))
+                .count();
     }
 
     private Map<String, Float> byConfigString(Map<BlockDefinition, Float> definitions) {

@@ -13,6 +13,7 @@ import java.util.Map;
 public class OcclusionConfig extends BlockSoundConfigBase {
 
     public static final String CREATE_AERONAUTICS_DEFAULTS_RESOURCE = "assets/sound_physics_remastered/block_sound_defaults/spr_create_aeronautics_occlusion.properties";
+    public static final String V3_MATERIAL_DEFAULTS_RESOURCE = "assets/sound_physics_remastered/block_sound_defaults/sound_physics_master_occlusion_v3.properties";
 
     public OcclusionConfig(Path path) {
         super(path);
@@ -58,6 +59,7 @@ public class OcclusionConfig extends BlockSoundConfigBase {
         map.put(new BlockIdDefinition(Blocks.JUKEBOX), 0F);
 
         addDefaultsFromResource(map, CREATE_AERONAUTICS_DEFAULTS_RESOURCE);
+        addDefaultsFromResource(map, V3_MATERIAL_DEFAULTS_RESOURCE);
     }
 
     @Override
