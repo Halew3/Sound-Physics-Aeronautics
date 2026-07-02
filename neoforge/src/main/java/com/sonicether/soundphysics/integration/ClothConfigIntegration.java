@@ -564,6 +564,46 @@ public class ClothConfigIntegration {
                 Component.translatable("cloth_config.sound_physics_remastered.propeller_far_field_skip_reverb_after_distance.description"),
                 SoundPhysicsMod.CONFIG.propellerFarFieldSkipReverbAfterDistance
         ));
+        propeller.addEntry(fromConfigEntry(entryBuilder,
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_occlusion_enabled"),
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_occlusion_enabled.description"),
+                SoundPhysicsMod.CONFIG.distantHorizonsFarPropellerOcclusionEnabled
+        ));
+        propeller.addEntry(fromConfigEntry(entryBuilder,
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_min_distance"),
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_min_distance.description"),
+                SoundPhysicsMod.CONFIG.distantHorizonsFarPropellerMinDistance
+        ));
+        propeller.addEntry(fromConfigEntry(entryBuilder,
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_probe_interval_ticks"),
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_probe_interval_ticks.description"),
+                SoundPhysicsMod.CONFIG.distantHorizonsFarPropellerProbeIntervalTicks
+        ));
+        propeller.addEntry(fromConfigEntry(entryBuilder,
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_max_strength"),
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_max_strength.description"),
+                SoundPhysicsMod.CONFIG.distantHorizonsFarPropellerMaxStrength
+        ));
+        propeller.addEntry(fromConfigEntry(entryBuilder,
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_gain_at_full_occlusion"),
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_gain_at_full_occlusion.description"),
+                SoundPhysicsMod.CONFIG.distantHorizonsFarPropellerGainAtFullOcclusion
+        ));
+        propeller.addEntry(fromConfigEntry(entryBuilder,
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_cutoff_at_full_occlusion"),
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_cutoff_at_full_occlusion.description"),
+                SoundPhysicsMod.CONFIG.distantHorizonsFarPropellerCutoffAtFullOcclusion
+        ));
+        propeller.addEntry(fromConfigEntry(entryBuilder,
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_max_ray_length"),
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_max_ray_length.description"),
+                SoundPhysicsMod.CONFIG.distantHorizonsFarPropellerMaxRayLength
+        ));
+        propeller.addEntry(fromConfigEntry(entryBuilder,
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_debug_logging"),
+                Component.translatable("cloth_config.sound_physics_remastered.distant_horizons_far_propeller_debug_logging.description"),
+                SoundPhysicsMod.CONFIG.distantHorizonsFarPropellerDebugLogging
+        ));
 
         ConfigCategory reflectivity = builder.getOrCreateCategory(Component.translatable("cloth_config.sound_physics_remastered.category.reflectivity"));
 

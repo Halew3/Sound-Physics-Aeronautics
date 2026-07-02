@@ -12,6 +12,7 @@ import com.sonicether.soundphysics.DiagnosticRuntimeOverrides;
 import com.sonicether.soundphysics.SoundPhysicsMod;
 import com.sonicether.soundphysics.SoundPhysicsSoundPolicy;
 import com.sonicether.soundphysics.config.SoundPhysicsConfig;
+import com.sonicether.soundphysics.integration.dh.DistantHorizonsAudioBridge;
 
 import de.maxhenkel.configbuilder.ConfigBuilder;
 import net.minecraft.sounds.SoundSource;
@@ -39,6 +40,9 @@ class PropellerRangeDiagnosticsTest {
         String joined = String.join("\n", PropellerLongRangeAudio.rangeDiagnosticsLines(8));
 
         assertTrue(joined.contains("propellerLongRange("));
+        assertTrue(joined.contains("dhFarPropellerOcclusion("));
+        assertTrue(joined.contains("enabled=false"));
+        assertTrue(joined.contains("apiReason=disabled_config"));
         assertTrue(joined.contains("safe mode: acoustic/Doppler bypass active; long-range source distance applied when sources exist"));
         assertTrue(joined.contains("No tracked propeller long-range sources."));
         assertTrue(joined.contains("Separate Sable Render Distance"));
@@ -58,6 +62,8 @@ class PropellerRangeDiagnosticsTest {
         assertTrue(unknown.contains("reason=distance_unknown"));
         assertTrue(unknown.contains("farField=unknown"));
         assertTrue(unknown.contains("directGainMultiplier=unknown"));
+        assertTrue(unknown.contains("dhKnown=false"));
+        assertTrue(unknown.contains("dhReason=no_state"));
 
         PropellerLongRangeAudio.computeFarField(9, context, 120.0D, 0.1F);
 
@@ -79,9 +85,12 @@ class PropellerRangeDiagnosticsTest {
         assertTrue(joined.contains("directCutoffMultiplier="));
         assertTrue(joined.contains("directGainMultiplier="));
         assertTrue(joined.contains("effectiveCutoff="));
+        assertTrue(joined.contains("dhKnown=false"));
+        assertTrue(joined.contains("dhStrength=0.000"));
         assertTrue(joined.contains("openAlMaxDistance=896.000"));
         assertTrue(joined.contains("openAlReferenceDistance=16.128"));
         assertTrue(joined.contains("openAlRolloff=1.350"));
+        assertTrue(DistantHorizonsAudioBridge.diagnosticsSummaryText().contains("enabled=false"));
     }
 
     private SoundPhysicsSoundPolicy.SoundContext largeContext() {

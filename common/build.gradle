@@ -5,8 +5,16 @@ apply from: "https://raw.githubusercontent.com/henkelmax/mod-gradle-scripts/${mo
 
 repositories {
     maven { url = 'https://maven.shedaniel.me/' }
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content {
+            includeGroup 'maven.modrinth'
+        }
+    }
 }
 
 dependencies {
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
+    compileOnly "maven.modrinth:Xs0XTOVv:${distant_horizons_api_version}"
 }

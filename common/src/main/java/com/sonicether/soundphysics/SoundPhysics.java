@@ -20,6 +20,8 @@ import org.lwjgl.openal.EXTEfx;
 
 import com.sonicether.soundphysics.config.ReverbParams;
 import com.sonicether.soundphysics.debug.RaycastRenderer;
+import com.sonicether.soundphysics.integration.dh.DistantHorizonsAudioBridge;
+import com.sonicether.soundphysics.integration.dh.DistantTerrainOcclusionResult;
 import com.sonicether.soundphysics.propeller.PropellerFarFieldEffect;
 import com.sonicether.soundphysics.propeller.PropellerLongRangeAudio;
 import com.sonicether.soundphysics.profiling.TaskProfiler;
@@ -473,6 +475,7 @@ public class SoundPhysics {
         LocalPlayer player = minecraft.player;
         ClientLevel level = minecraft.level;
         Vec3 soundPos = new Vec3(posX, posY, posZ);
+        Vec3 actualSoundPos = soundPos;
         SoundPhysicsTrace.recordEvaluateEnvironment(sourceID, soundPos, category, sound, auxOnly);
         SoundPhysicsPolicyDiagnostics.recordContextObserved(context);
         RecordDiagnostics.observeSource(sourceID, soundPos, context);
@@ -791,8 +794,20 @@ public class SoundPhysics {
         float airAbsorption = SoundPhysicsMod.CONFIG.airAbsorption.get();
         if (PropellerLongRangeAudio.isEligible(context)) {
             PropellerFarFieldEffect effect = PropellerLongRangeAudio.computeFarField(sourceID, context, soundDistance, airAbsorption);
+            double actualSoundDistance = playerPos.distanceTo(actualSoundPos);
+            DistantTerrainOcclusionResult dh = DistantHorizonsAudioBridge.computeFarPropellerOcclusion(
+                    sourceID,
+                    level,
+                    context,
+                    playerPos,
+                    actualSoundPos,
+                    actualSoundDistance,
+                    effect.distanceNorm()
+            );
             directCutoff *= effect.directCutoffMultiplier();
             directGain *= effect.directGainMultiplier();
+            directCutoff *= dh.directCutoffMultiplier();
+            directGain *= dh.directGainMultiplier();
             airAbsorption = effect.airAbsorption();
         }
         if (SoundPhysicsSoundPolicy.isRecord(context)) {
