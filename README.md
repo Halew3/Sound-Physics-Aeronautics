@@ -77,11 +77,8 @@ Common commands:
 
 Major changes include:
 
-* Sable moving sublevel acoustic support
-* Create Aeronautics propeller recognition
+* Sable sublevel acoustic support
 * long-range propeller audio
-* propeller range scaling by reflected sail count / RPM when available
-* distant propeller muffling and gain shaping
 * Doppler support for selected positional sources
 * safer policy handling for modded ambient and machinery sounds
 * catered physics properties for relevent Create and Aeronautics blocks. 
@@ -107,9 +104,9 @@ Do **not** install Sound Physics Remastered alongside SPR Aeronautics. Use one o
 
 SPR Aeronautics focuses on Create Aeronautics and Sable moving sublevels.
 
-SPR Aeronautics is also, naturally, heavier on performance. Despite this, almost anyone who can run SPR should be able to run SPR Aeronautics, especially with some adjustment to configs. Extensive optimizations are in place. 
+SPR Aeronautics is also, naturally, heavier on performance. Despite this, almost anyone who can run SPR should also be able to run SPR Aeronautics, especially with some adjustment to configs. Extensive optimizations are in place. 
 
-It does **not** currently work on Create contraptions, only sable sublevels are integrated.  Normal Create trains, gantries, minecart contraptions, and other moving entities may still behave like ordinary positional sounds but support is planned for these. 
+It does **not** *currently* work on Create contraptions, only sable sublevels are integrated.  Normal Create trains, gantries, minecart contraptions, and other moving entities may still behave like ordinary positional sounds but support is planned for these. 
 
 ---
 
