@@ -10,11 +10,17 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 public class SoundRateConfig extends CommentedPropertyConfig {
+
+    public static final String CURATED_DEFAULTS_RESOURCE = "assets/sound_physics_remastered/sound_rate_defaults/curated_sound_rates.properties";
 
     private Map<ResourceLocation, Integer> soundRateConfig;
 
@@ -112,7 +118,45 @@ public class SoundRateConfig extends CommentedPropertyConfig {
         map.put(SoundEvents.LIGHTNING_BOLT_THUNDER.getLocation(), 0);
         SoundEvents.GOAT_HORN_SOUND_VARIANTS.forEach(r -> map.put(r.key().location(), 0));
 
+        addDefaultsFromResource(map, CURATED_DEFAULTS_RESOURCE);
+
         return map;
+    }
+
+    private void addDefaultsFromResource(Map<ResourceLocation, Integer> map, String resourcePath) {
+        Properties resourceProperties = new Properties();
+        try (InputStream inputStream = SoundRateConfig.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                Loggers.warn("Sound rate defaults resource {} not found", resourcePath);
+                return;
+            }
+            resourceProperties.load(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            Loggers.warn("Failed to load sound rate defaults resource {}", resourcePath, e);
+            return;
+        }
+
+        for (String key : resourceProperties.stringPropertyNames()) {
+            String valueString = resourceProperties.getProperty(key);
+            int value;
+            try {
+                value = Integer.parseInt(valueString.trim());
+            } catch (NumberFormatException e) {
+                Loggers.warn("Failed to parse value of {} in sound rate defaults resource {}", key, resourcePath);
+                continue;
+            }
+
+            ResourceLocation resourceLocation = ResourceLocation.tryParse(key);
+            if (resourceLocation == null) {
+                Loggers.warn("Sound rate default {} from resource {} is not a valid sound ID", key, resourcePath);
+                continue;
+            }
+            if (BuiltInRegistries.SOUND_EVENT.getOptional(resourceLocation).isEmpty()) {
+                continue;
+            }
+
+            map.put(resourceLocation, value);
+        }
     }
 
 }

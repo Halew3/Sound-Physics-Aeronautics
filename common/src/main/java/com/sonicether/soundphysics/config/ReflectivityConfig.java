@@ -10,6 +10,8 @@ import java.util.Map;
 
 public class ReflectivityConfig extends BlockSoundConfigBase {
 
+    public static final String CREATE_AERONAUTICS_DEFAULTS_RESOURCE = "assets/sound_physics_remastered/block_sound_defaults/spr_create_aeronautics_reflectivity.properties";
+
     public ReflectivityConfig(Path path) {
         super(path);
     }
@@ -50,6 +52,8 @@ public class ReflectivityConfig extends BlockSoundConfigBase {
         putSoundType(map, SoundType.GLASS, 0.75F);
         putSoundType(map, SoundType.SAND, 0.2F);
         putSoundType(map, SoundType.SNOW, 0.15F);
+
+        addDefaultsFromResource(map, CREATE_AERONAUTICS_DEFAULTS_RESOURCE);
     }
 
     @Override

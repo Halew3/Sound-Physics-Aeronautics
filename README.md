@@ -2,9 +2,7 @@
 
 **Sound Physics Aeronautics** is a fork of [Sound Physics Remastered](https://github.com/henkelmax/sound-physics-remastered) built around **Create Aeronautics** and **Sable** moving sublevel acoustics.
 
-The core Sound Physics experience is preserved and extended so that moving sublevels are no longer ignored.
-
-This is an alpha release. Core Sound Physics behavior should remain usable, but the new Aeronautics/Sable features are still being tuned. Expect rough edges around unusual modded sound sources, huge modpacks, and experimental moving-world setups.
+Extends Sound Physics so that sublevels are no longer ignored. In short, your Create Aeronautics creations are missing sound physics. Sound Physics Aeronautics fixes that.
 
 ---
 
@@ -12,7 +10,7 @@ This is an alpha release. Core Sound Physics behavior should remain usable, but 
 
 ### Moving Acoustics
 
-Moving sublevels can contribute their rotated and moving geometry to acoustic checks, letting Sound Physics-style effects behave more naturally around Aeronautics vehicles.
+Moving sublevels can contribute their rotated and moving geometry to acoustic checks, letting Sound Physics effects behave naturally around Aeronautics vehicles.
 
 Depending on the situation, this can affect:
 
@@ -28,11 +26,11 @@ Depending on the situation, this can affect:
 
 Large, high-RPM Aeronautics propellers can carry far beyond vanilla range, with a configurable hard cap up to 1024 blocks.
 
-Vanilla Aeronautics propellers have a sound range of 48 blocks. SPR Aeronautics scales range using propeller size and speed when available, with fallback handling for other propellers as well.
+Vanilla Aeronautics propellers have a sound range of just 48 blocks. SPR Aeronautics scales that range up to 1024 blocks depending on propeller size and speed!
 
-They appropriately become softer and more distant with range, turning into a subtle background presence instead of a full-volume machine blasting the player from hundreds of blocks away.
+They appropriately become softer and more distant with range, turning into a subtle background presence instead of assasulting your ears.
 
-This is intentionally scoped to Aeronautics propellers for the time being, but compatibility with other propulsion sounds from addons is planned.
+Compatibility with other propulsion sounds from addons like Create: Propulsion is planned.
 
 ---
 
@@ -40,37 +38,19 @@ This is intentionally scoped to Aeronautics propellers for the time being, but c
 
 SPR Aeronautics adds a Doppler effect for positional sound sources, fully configurable.
 
-When a supported source moves toward or away from the listener, its pitch can shift based on relative motion. This is especially noticeable with Aeronautics propellers and moving airships.
+When a supported source moves toward or away from the listener, its pitch can shift based on relative motion. Neat, huh?
 
 
 ---
 
 ### Improved Sound Policy for Modded Worlds
 
-Large modpacks contain a lot of weird sounds: global ambience, fake positional loops, music, machinery, records, weather, and mod-specific sound wrappers.
+Large modpacks contain a lot of weird sounds that aren't handled well by the original SPR mod without extensive configuration.
 
-SPR Aeronautics adds a stricter sound policy layer so the mod can be more careful about what it processes, improving broad compatibility.
+SPR Aeronautics adds a stricter sound policy layer so the mod can be more careful about what it processes, improving broad compatibility. 
 
 This helps avoid applying expensive acoustic logic to sounds that basically don't deserve it.
 
----
-
-### Runtime Diagnostics
-
-SPR Aeronautics includes in-game diagnostic commands for testing sound behavior, propeller tracking, Doppler state, audio source recovery, and acoustic processing.
-
-Most players will never need these, but they are useful for modpack authors, testers, and anyone tuning aircraft audio.
-
-Common commands:
-
-```mcfunction
-/spr_aero preset quiet
-/spr_aero audio status
-/spr_aero audio sources
-/spr_aero propeller sources
-/spr_aero propeller range
-/spr_aero doppler status
-```
 
 ---
 
@@ -82,8 +62,8 @@ Major changes include:
 * Sable sublevel acoustic support
 * long-range propeller audio
 * Doppler support for selected positional sources
-* safer policy handling for modded ambient and machinery sounds
-* catered physics properties for relevant Create and Aeronautics blocks
+* safer policy handling/compatability with more than 30 popular mods so far
+* catered physics properties for Create and Create Aeronautics blocks with more on the way
 
 ---
 
@@ -101,44 +81,17 @@ Sable
 
 Do **not** install Sound Physics Remastered alongside SPR Aeronautics. Use one or the other.
 
-The mod can load without an active Aeronautics ship, but its main features are designed for Create Aeronautics/Sable packs. If you are not using Aeronautics or Sable, the original Sound Physics Remastered by henkelmax is usually the better choice.
+If you are not using Aeronautics or at least Sable, the original Sound Physics Remastered by henkelmax is probably the better choice.
 
 ---
 
 ## Known Limits
 
-SPR Aeronautics focuses on Create Aeronautics and Sable moving sublevels.
+SPR Aeronautics is, naturally, a bit heavier on performance. Despite this, almost anyone who can run SPR should also be able to run SPR Aeronautics. Extensive optimizations are in place and config tweaks should allow this to run on a sweet potatoe. 
 
-<<<<<<< HEAD
-SPR Aeronautics is also, naturally, heavier on performance. Despite this, almost anyone who can run SPR should also be able to run SPR Aeronautics, especially with some adjustment to configs. Extensive optimizations are in place. 
-
-It does **not** *currently* work on Create contraptions, only sable sublevels are integrated.  Normal Create trains, gantries, minecart contraptions, and other moving entities may still behave like ordinary positional sounds but support is planned for these. 
+It does **not** *currently* work on Create contraptions, only sable sublevels are integrated. Normal Create trains, gantries, minecart contraptions, and other moving entities still behave like ordinary positional sounds but wider support is planned for these. 
 =======
-Public alpha builds are NeoForge 1.21.1 only. Fabric and Forge source folders are inherited from upstream and are not supported release targets for this fork.
 
-SPR Aeronautics does more work than upstream Sound Physics Remastered when Sable/Aeronautics features are active. Defaults are tuned conservatively, debug rendering is off by default, and distant propeller processing uses targeted shortcuts where possible.
-
-If performance drops suddenly, first make sure debug ray rendering and trace logging are disabled.
-
-It does **not** currently work on Create contraptions, only Sable sublevels are integrated. Normal Create trains, gantries, minecart contraptions, and other moving entities may still behave like ordinary positional sounds.
-
----
-
-## Building
-
-```powershell
-$env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot'
-.\gradlew.bat :neoforge:test :neoforge:alphaJar :neoforge:verifyAlphaJar --no-daemon
-```
-
-The release artifact is written to:
-
-```text
-neoforge/build/alpha/
-```
->>>>>>> 1fe705c (default tweaks)
-
----
 
 ## Credits and Lineage
 
@@ -151,7 +104,7 @@ which descends from:
 * [Sound Physics](https://github.com/sonicether/Sound-Physics) by [Sonic Ether](https://github.com/sonicether)
 
 
-SPR Aeronautics preserves that lineage while focusing on Create Aeronautics, Sable moving sublevels, long-range aircraft audio, and moving-machine sound physics.
+SPR Aeronautics preserves that lineage while focusing on moving-machine sound physics.
 
 ---
 

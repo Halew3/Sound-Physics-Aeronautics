@@ -1,6 +1,9 @@
 package com.sonicether.soundphysics.config.blocksound;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -14,6 +17,7 @@ import de.maxhenkel.configbuilder.CommentedPropertyConfig;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -201,6 +205,66 @@ public abstract class BlockSoundConfigBase extends CommentedPropertyConfig {
 
     protected static void putSoundType(Map<BlockDefinition, Float> map, SoundType soundType, float value) {
         map.put(new BlockSoundTypeDefinition(soundType), value);
+    }
+
+    protected void addDefaultsFromResource(Map<BlockDefinition, Float> map, String resourcePath) {
+        Properties resourceProperties = new Properties();
+        try (InputStream inputStream = BlockSoundConfigBase.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                Loggers.warn("Block sound defaults resource {} not found", resourcePath);
+                return;
+            }
+            resourceProperties.load(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            Loggers.warn("Failed to load block sound defaults resource {}", resourcePath, e);
+            return;
+        }
+
+        for (String key : resourceProperties.stringPropertyNames()) {
+            String valueString = resourceProperties.getProperty(key);
+            float value;
+            try {
+                value = Float.parseFloat(valueString.trim());
+            } catch (NumberFormatException e) {
+                Loggers.warn("Failed to parse value of {} in block sound defaults resource {}", key, resourcePath);
+                continue;
+            }
+
+            BlockDefinition blockDefinition = loadDefaultBlockDefinition(key);
+            if (blockDefinition == null) {
+                Loggers.warn("Block definition {} from block sound defaults resource {} not found", key, resourcePath);
+                continue;
+            }
+
+            map.put(blockDefinition, value);
+        }
+    }
+
+    @Nullable
+    private static BlockDefinition loadDefaultBlockDefinition(String configString) {
+        BlockDefinition blockDefinition = BlockTagDefinition.fromConfigString(configString);
+        if (blockDefinition != null) {
+            return blockDefinition;
+        }
+        blockDefinition = loadRegisteredBlockIdDefinition(configString);
+        if (blockDefinition != null) {
+            return blockDefinition;
+        }
+        return BlockSoundTypeDefinition.fromConfigString(configString);
+    }
+
+    @Nullable
+    private static BlockDefinition loadRegisteredBlockIdDefinition(String configString) {
+        if (!configString.contains(":")) {
+            return null;
+        }
+        ResourceLocation resourceLocation = ResourceLocation.tryParse(configString);
+        if (resourceLocation == null) {
+            return null;
+        }
+        return BuiltInRegistries.BLOCK.getOptional(resourceLocation)
+                .map(BlockIdDefinition::new)
+                .orElse(null);
     }
 
 }

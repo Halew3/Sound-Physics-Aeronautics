@@ -821,6 +821,13 @@ public class SoundPhysics {
             SoundPhysicsPolicyDiagnostics.recordAcousticDecision(SoundPhysicsSoundPolicy.Decision.skip(decisionReason));
         }
 
+        if (isOverloadSkip(decisionReason)) {
+            SoundPhysicsPolicyDiagnostics.recordEnvironmentUntouched(context);
+            Loggers.logTrace("Skipped acoustic processing without resetting source={} sound={} reason={}", sourceID, sound, decisionReason);
+            SoundPhysicsPerfDiagnostics.recordEvaluateEnvironment(System.nanoTime() - evaluateStartNanos);
+            return null;
+        }
+
         if (SoundPhysicsSoundPolicy.shouldLeaveSourceUntouchedOnSkip(context, decisionReason)) {
             SoundPhysicsPolicyDiagnostics.recordEnvironmentUntouched(context);
             Loggers.logTrace("Skipped acoustic processing without touching source={} sound={} reason={}", sourceID, sound, decisionReason);
@@ -830,6 +837,12 @@ public class SoundPhysics {
         }
         SoundPhysicsPerfDiagnostics.recordEvaluateEnvironment(System.nanoTime() - evaluateStartNanos);
         return null;
+    }
+
+    private static boolean isOverloadSkip(SoundPhysicsSoundPolicy.DecisionReason reason) {
+        return reason == SoundPhysicsSoundPolicy.DecisionReason.SKIP_RATE_LIMIT
+                || reason == SoundPhysicsSoundPolicy.DecisionReason.SKIP_THROTTLE
+                || reason == SoundPhysicsSoundPolicy.DecisionReason.SKIP_IMPACT_DEDUPE;
     }
 
     public static boolean isAmbientSound(@Nullable ResourceLocation sound) {
