@@ -39,8 +39,9 @@ public class SourceMixin {
 
     @Inject(method = "play", at = @At("HEAD"))
     private void play(CallbackInfo ci) {
-        var category = SoundPhysics.getLastSoundCategory();
-        var sound = SoundPhysics.getLastSound();
+        var context = SoundPhysics.getLastSoundContext();
+        var category = context.category();
+        var sound = context.soundId();
         SoundPhysicsTrace.recordChannelPlayHead(source, pos, category, sound);
         SoundPhysicsTrace.recordSourceMixinPlay(source, pos, category, sound);
         if (pos == null) {
@@ -60,8 +61,8 @@ public class SourceMixin {
             return;
         }
         SoundPhysicsTrace.recordProcessingPath(SoundProcessingDeduper.ProcessingPath.SOURCE_MIXIN, source, sound);
-        SoundPhysics.onPlaySound(pos.x, pos.y, pos.z, source);
-        var context = SoundPhysics.getLastSoundContext();
+        SoundPhysicsTrace.recordSourceMixinProcessExpected(source, pos, category, sound);
+        SoundPhysics.onPlaySound(pos.x, pos.y, pos.z, source, category, sound, context);
         if (SoundPhysicsSoundPolicy.isKnownPropeller(context)) {
             PropellerLongRangeAudio.applyFallbackSourceRange(source, context, 1.6F, 1.0F);
         }

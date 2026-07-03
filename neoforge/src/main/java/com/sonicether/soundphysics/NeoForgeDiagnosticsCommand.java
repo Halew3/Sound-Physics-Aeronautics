@@ -212,6 +212,7 @@ final class NeoForgeDiagnosticsCommand {
 
     private static int dumpFull(net.minecraft.commands.CommandSourceStack source) {
         send(source, "SPR Aeronautics diagnostics full");
+        send(source, "SPRA_PATCH_ID=" + SoundPhysicsMod.SPRA_PATCH_ID);
         send(source, "Config: " + ConfigDiagnostics.criticalValuesSummary());
         send(source, "Core: " + SoundPhysicsTrace.diagnosticsSummaryText());
         send(source, "Policy: " + SoundPhysicsPolicyDiagnostics.diagnosticsSummaryText());
@@ -221,7 +222,8 @@ final class NeoForgeDiagnosticsCommand {
         send(source, "Sable: " + sableDiagnosticsText());
         send(source, "Perf: " + SoundPhysicsPerfDiagnostics.summaryText());
         Loggers.log(
-                "SPR Aeronautics diagnostics full | Core: {} | Policy: {} | Ray renderer: {} | Doppler: {} | Sable: {} | Perf: {}",
+                "SPR Aeronautics diagnostics full | SPRA_PATCH_ID={} | Core: {} | Policy: {} | Ray renderer: {} | Doppler: {} | Sable: {} | Perf: {}",
+                SoundPhysicsMod.SPRA_PATCH_ID,
                 SoundPhysicsTrace.diagnosticsSummaryText(),
                 SoundPhysicsPolicyDiagnostics.diagnosticsSummaryText(),
                 RaycastRenderer.diagnosticsSummaryText(),

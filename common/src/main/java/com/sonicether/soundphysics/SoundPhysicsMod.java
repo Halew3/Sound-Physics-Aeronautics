@@ -15,6 +15,7 @@ import java.nio.file.Path;
 public abstract class SoundPhysicsMod {
 
     public static final String MODID = "sound_physics_remastered";
+    public static final String SPRA_PATCH_ID = "context-explicit-overload-fallback-v1";
 
     public static SoundPhysicsConfig CONFIG;
     public static ReflectivityConfig REFLECTIVITY_CONFIG;
@@ -27,6 +28,7 @@ public abstract class SoundPhysicsMod {
 
     public void initClient() {
         initConfig();
+        Loggers.log("SPRA_PATCH_ID={}", SPRA_PATCH_ID);
         CONFIG.reloadClient();
 
         renameAllowedSounds();

@@ -10,4 +10,8 @@ public interface AcousticScene {
 
     AcousticBlockRef blockAt(Vec3 worldPosition);
 
+    default Vec3 toLocalPosition(AcousticBlockRef blockRef, Vec3 worldPosition) {
+        return worldPosition;
+    }
+
 }

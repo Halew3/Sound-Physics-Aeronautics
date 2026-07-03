@@ -1,6 +1,8 @@
 package com.sonicether.soundphysics;
 
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -12,6 +14,7 @@ import com.sonicether.soundphysics.acoustic.AcousticScene;
 import com.sonicether.soundphysics.acoustic.AcousticSceneContext;
 import com.sonicether.soundphysics.acoustic.AcousticScenes;
 import com.sonicether.soundphysics.utils.SoundRateManager;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.FluidTags;
 import org.lwjgl.openal.AL10;
@@ -36,20 +39,28 @@ import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 public class SoundPhysics {
 
     private static final float PHI = 1.618033988F;
     private static final double OCCLUSION_EPSILON = 1.0E-4D;
     private static final double RAY_ORIGIN_ADVANCE_EPSILON = 1.0E-4D;
-    private static final int MIN_OPEN_VARIATION_SAMPLES_TO_OVERRIDE_BLOCKED_DIRECT = 3;
+    private static final int ACOUSTIC_ENVIRONMENT_CACHE_MAX_SIZE = 64;
+    private static final int ACOUSTIC_ENVIRONMENT_CACHE_TTL_TICKS = 20;
+    private static final double ACOUSTIC_ENVIRONMENT_CACHE_RADIUS = 3.0D;
+    private static final double ACOUSTIC_ENVIRONMENT_CACHE_RADIUS_SQR = ACOUSTIC_ENVIRONMENT_CACHE_RADIUS * ACOUSTIC_ENVIRONMENT_CACHE_RADIUS;
 
     private static final Pattern AMBIENT_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-\\.]+:ambient\\..*$");
     private static final Pattern BLOCK_PATTERN = Pattern.compile(".*block..*");
+    private static final Deque<AcousticEnvironmentSnapshot> ACOUSTIC_ENVIRONMENT_SNAPSHOTS = new ArrayDeque<>();
+    private static final EnvironmentBackend OPEN_AL_ENVIRONMENT_BACKEND = SoundPhysics::applyOpenAlEnvironment;
+    private static EnvironmentBackend environmentBackend = OPEN_AL_ENVIRONMENT_BACKEND;
 
     private static int auxFXSlot0;
     private static int auxFXSlot1;
@@ -236,7 +247,8 @@ public class SoundPhysics {
     }
 
     public static String audioStatusText() {
-        return "efxInitialized=" + efxInitialized
+        return "SPRA_PATCH_ID=" + SoundPhysicsMod.SPRA_PATCH_ID
+                + ", efxInitialized=" + efxInitialized
                 + ", efxInitCount=" + efxInitCount.get()
                 + ", efxDestroyCount=" + efxDestroyCount.get()
                 + ", efxLastInitReason=" + efxLastInitReason
@@ -404,6 +416,19 @@ public class SoundPhysics {
         processSound(sourceID, posX, posY, posZ, lastSoundCategory, lastSound, false);
     }
 
+    public static void onPlaySound(
+            double posX,
+            double posY,
+            double posZ,
+            int sourceID,
+            SoundSource category,
+            ResourceLocation sound,
+            SoundPhysicsSoundPolicy.SoundContext context
+    ) {
+        SoundPhysicsTrace.recordOnPlaySound(sourceID, posX, posY, posZ, category, sound);
+        processSound(sourceID, posX, posY, posZ, category, sound, false, context);
+    }
+
     /**
      * The old method signature of soundphysics to stay compatible
      */
@@ -501,7 +526,7 @@ public class SoundPhysics {
             SoundPhysicsSoundPolicy.DecisionReason reason = SoundPhysicsSoundPolicy.isRecord(context) && (posX == 0D && posY == 0D && posZ == 0D)
                     ? SoundPhysicsSoundPolicy.DecisionReason.RECORD_SKIPPED_ZERO_POSITION
                     : SoundPhysicsSoundPolicy.DecisionReason.SKIP_WORLD_NOT_INITIALIZED;
-            return skipEnvironment(sourceID, sound, "missing player/level or zero position", auxOnly, context, reason, evaluateStartNanos);
+            return skipEnvironment(sourceID, soundPos, sound, category, "missing player/level or zero position", auxOnly, context, reason, evaluateStartNanos);
         }
         double distance = player.position().distanceTo(soundPos);
         double maxProcessingDistance = PropellerLongRangeAudio.effectiveProcessingDistance(
@@ -511,29 +536,29 @@ public class SoundPhysics {
         );
         if (SoundProcessingPolicy.isTooDistant(distance, maxProcessingDistance)) {
             Loggers.logDebug("Sound {} is too far away from player ({} blocks)", sound, distance);
-            return skipEnvironment(sourceID, sound, "distance", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_DISTANCE, evaluateStartNanos);
+            return skipEnvironment(sourceID, soundPos, sound, category, "distance", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_DISTANCE, evaluateStartNanos);
         }
 
         SoundPhysicsSoundPolicy.Decision policyDecision = SoundPhysicsSoundPolicy.evaluateAcoustic(SoundPhysicsMod.CONFIG, context);
         if (!policyDecision.apply()) {
-            return skipEnvironment(sourceID, sound, "sound policy " + policyDecision.reason(), auxOnly, context, policyDecision.reason(), evaluateStartNanos);
+            return skipEnvironment(sourceID, soundPos, sound, category, "sound policy " + policyDecision.reason(), auxOnly, context, policyDecision.reason(), evaluateStartNanos);
         }
 
         if (!SoundRateManager.isWorldInitialized()) {
             Loggers.logDebug("Sound {} skipped because the world is not initialized yet", sound);
-            return skipEnvironment(sourceID, sound, "world not initialized", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_WORLD_NOT_INITIALIZED, evaluateStartNanos);
+            return skipEnvironment(sourceID, soundPos, sound, category, "world not initialized", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_WORLD_NOT_INITIALIZED, evaluateStartNanos);
         }
 
         if (!SoundPhysicsSoundPolicy.isSoundRateLimitExempt(context) && SoundRateManager.incrementAndCheckLimit(sound)) {
             Loggers.logDebug("Sound {} skipped due to sound rate limit", sound);
-            return skipEnvironment(sourceID, sound, "sound rate limit", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_RATE_LIMIT, evaluateStartNanos);
+            return skipEnvironment(sourceID, soundPos, sound, category, "sound rate limit", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_RATE_LIMIT, evaluateStartNanos);
         }
 
         long gameTime = level.getGameTime();
         if (context.startEvent()
                 && !SoundPhysicsSoundPolicy.isStartThrottleExempt(context)
                 && !SoundPhysicsPerfDiagnostics.recordSoundStart(gameTime, SoundPhysicsMod.CONFIG.soundPhysicsMaxSoundStartsPerTick.get())) {
-            return skipEnvironment(sourceID, sound, SoundPhysicsPerfDiagnostics.soundStartThrottleReason(sound), auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_THROTTLE, evaluateStartNanos);
+            return skipEnvironment(sourceID, soundPos, sound, category, SoundPhysicsPerfDiagnostics.soundStartThrottleReason(sound), auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_THROTTLE, evaluateStartNanos);
         }
 
         if (context.startEvent()
@@ -547,7 +572,7 @@ public class SoundPhysics {
                 SoundPhysicsMod.CONFIG.soundPhysicsImpactBurstDedupeRadius.get(),
                 SoundPhysicsMod.CONFIG.soundPhysicsImpactBurstDedupeTicks.get()
         )) {
-            return skipEnvironment(sourceID, sound, "impact burst dedupe", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_IMPACT_DEDUPE, evaluateStartNanos);
+            return skipEnvironment(sourceID, soundPos, sound, category, "impact burst dedupe", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_IMPACT_DEDUPE, evaluateStartNanos);
         }
 
         float directCutoff;
@@ -560,7 +585,7 @@ public class SoundPhysics {
 
         AcousticScene scene = AcousticScenes.createScene(minecraft, new AcousticSceneContext(sourceID, soundPos, playerPos, category, sound));
         if (scene == null) {
-            return skipEnvironment(sourceID, sound, "null acoustic scene", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_NULL_SCENE, evaluateStartNanos);
+            return skipEnvironment(sourceID, soundPos, sound, category, "null acoustic scene", auxOnly, context, SoundPhysicsSoundPolicy.DecisionReason.SKIP_NULL_SCENE, evaluateStartNanos);
         }
 
         AcousticBlockRef soundBlock = scene.blockAt(soundPos);
@@ -570,7 +595,7 @@ public class SoundPhysics {
         Loggers.logDebug("Player pos: {}, {}, {} \tSound Pos: {}, {}, {} \tTo player vector: {}, {}, {}", playerPos.x, playerPos.y, playerPos.z, soundPos.x, soundPos.y, soundPos.z, normalToPlayer.x, normalToPlayer.y, normalToPlayer.z);
 
         RaycastRenderer.setCurrentSoundContext(context);
-        double occlusionAccumulation = calculateOcclusion(scene, soundPos, playerPos, category, sound);
+        double occlusionAccumulation = calculateOcclusion(sourceID, scene, soundPos, playerPos, category, sound);
 
         directCutoff = (float) Math.exp(-occlusionAccumulation * absorptionCoeff);
         float directGain = auxOnly ? 0F : (float) Math.pow(directCutoff, 0.1D);
@@ -730,7 +755,7 @@ public class SoundPhysics {
         @Nullable Vec3 newSoundPos = skipPropellerReverb ? null : audioDirection.evaluateSoundPosition(soundPos, playerPos);
 
         if (newSoundPos != null) {
-            setSoundPos(sourceID, newSoundPos);
+            setSoundPos(sourceID, newSoundPos, category, sound);
             soundPos = newSoundPos;
         }
 
@@ -818,7 +843,10 @@ public class SoundPhysics {
         if (SoundPhysicsSoundPolicy.isRecord(context)) {
             RecordDiagnostics.recordAcousticProcessed(sourceID, occlusionAccumulation, directCutoff, directGain, sendGain0, sendGain1, sendGain2, sendGain3);
         }
-        setEnvironment(sourceID, sendGain0, sendGain1, sendGain2, sendGain3, sendCutoff0, sendCutoff1, sendCutoff2, sendCutoff3, directCutoff, directGain, airAbsorption);
+        EnvironmentParameters environment = new EnvironmentParameters(sendGain0, sendGain1, sendGain2, sendGain3, sendCutoff0, sendCutoff1, sendCutoff2, sendCutoff3, directCutoff, directGain, airAbsorption);
+        if (applyEnvironmentToSource(sourceID, environment, category, sound)) {
+            storeAcousticEnvironmentSnapshot(environment, actualSoundPos, sound, category, level.getGameTime());
+        }
         RaycastRenderer.clearCurrentSoundContext();
         SoundPhysicsPolicyDiagnostics.recordProcessedNormally(context);
 
@@ -829,7 +857,9 @@ public class SoundPhysics {
     @Nullable
     private static Vec3 skipEnvironment(
             int sourceID,
+            Vec3 soundPos,
             @Nullable ResourceLocation sound,
+            @Nullable SoundSource category,
             String traceReason,
             boolean auxOnly,
             SoundPhysicsSoundPolicy.SoundContext context,
@@ -842,8 +872,12 @@ public class SoundPhysics {
         }
 
         if (isOverloadSkip(decisionReason)) {
-            SoundPhysicsPolicyDiagnostics.recordEnvironmentUntouched(context);
-            Loggers.logTrace("Skipped acoustic processing without resetting source={} sound={} reason={}", sourceID, sound, decisionReason);
+            logOverloadSkipCaughtIfNeeded(sourceID, soundPos, sound, decisionReason);
+            if (!applyOverloadFallback(sourceID, soundPos, category, sound, auxOnly, context, decisionReason)) {
+                SoundPhysicsPolicyDiagnostics.recordOverloadFallbackFailed();
+                SoundPhysicsPolicyDiagnostics.recordEnvironmentUntouched(context);
+                Loggers.warn("SPRA OVERLOAD_FALLBACK_FAILED source={} sound={} reason={}", sourceID, sound, decisionReason);
+            }
             SoundPhysicsPerfDiagnostics.recordEvaluateEnvironment(System.nanoTime() - evaluateStartNanos);
             return null;
         }
@@ -863,6 +897,178 @@ public class SoundPhysics {
         return reason == SoundPhysicsSoundPolicy.DecisionReason.SKIP_RATE_LIMIT
                 || reason == SoundPhysicsSoundPolicy.DecisionReason.SKIP_THROTTLE
                 || reason == SoundPhysicsSoundPolicy.DecisionReason.SKIP_IMPACT_DEDUPE;
+    }
+
+    private static void logOverloadSkipCaughtIfNeeded(int sourceID, Vec3 soundPos, @Nullable ResourceLocation sound, SoundPhysicsSoundPolicy.DecisionReason decisionReason) {
+        if (decisionReason != SoundPhysicsSoundPolicy.DecisionReason.SKIP_IMPACT_DEDUPE || !isSuspiciousRawOcclusionSound(sound, null)) {
+            return;
+        }
+        Loggers.warn("SPRA OVERLOAD_SKIP_CAUGHT source={} sound={} pos={} reason={}", sourceID, sound, soundPos, decisionReason);
+    }
+
+    private static boolean applyOverloadFallback(
+            int sourceID,
+            Vec3 soundPos,
+            @Nullable SoundSource category,
+            @Nullable ResourceLocation sound,
+            boolean auxOnly,
+            SoundPhysicsSoundPolicy.SoundContext context,
+            SoundPhysicsSoundPolicy.DecisionReason decisionReason
+    ) {
+        long gameTime = currentClientGameTime();
+        if (applyCachedOverloadFallback(sourceID, soundPos, category, sound, context, decisionReason, gameTime)) {
+            return true;
+        }
+        return applyDirectOnlyOverloadFallback(sourceID, soundPos, category, sound, auxOnly, context, decisionReason, gameTime);
+    }
+
+    private static boolean applyCachedOverloadFallback(
+            int sourceID,
+            Vec3 soundPos,
+            @Nullable SoundSource category,
+            @Nullable ResourceLocation sound,
+            SoundPhysicsSoundPolicy.SoundContext context,
+            SoundPhysicsSoundPolicy.DecisionReason decisionReason,
+            long gameTime
+    ) {
+        @Nullable SnapshotMatch match = findNearestEnvironmentSnapshot(soundPos, category, sound, gameTime);
+        if (match == null) {
+            return false;
+        }
+
+        AcousticEnvironmentSnapshot snapshot = match.snapshot();
+        EnvironmentParameters environment = snapshot.environment();
+        if (!applyEnvironmentToSource(sourceID, environment, category, sound)) {
+            return false;
+        }
+
+        storeAcousticEnvironmentSnapshot(environment, soundPos, sound, category, gameTime);
+        SoundPhysicsPolicyDiagnostics.recordOverloadFallbackNearestApplied();
+        Loggers.log(
+                "SPRA OVERLOAD_FALLBACK_APPLIED source={} sound={} reason={} fallback=nearest cachedSound={} distance={} ageTicks={}",
+                sourceID,
+                sound,
+                decisionReason,
+                snapshot.sound(),
+                match.distance(),
+                match.ageTicks()
+        );
+        if (SoundPhysicsSoundPolicy.isKnownPropeller(context)
+                && (environment.directCutoff() < 0.99F || environment.directGain() < 0.99F
+                || environment.sendGain0() > 0.0F || environment.sendGain1() > 0.0F || environment.sendGain2() > 0.0F || environment.sendGain3() > 0.0F)) {
+            SoundPhysicsPolicyDiagnostics.recordPropellerMuffledOrFiltered();
+        }
+        return true;
+    }
+
+    private static boolean applyDirectOnlyOverloadFallback(
+            int sourceID,
+            Vec3 soundPos,
+            @Nullable SoundSource category,
+            @Nullable ResourceLocation sound,
+            boolean auxOnly,
+            SoundPhysicsSoundPolicy.SoundContext context,
+            SoundPhysicsSoundPolicy.DecisionReason decisionReason,
+            long gameTime
+    ) {
+        try {
+            Vec3 playerPos = minecraft.gameRenderer.getMainCamera().getPosition();
+            AcousticScene scene = AcousticScenes.createScene(minecraft, new AcousticSceneContext(sourceID, soundPos, playerPos, category, sound));
+            if (scene == null) {
+                return false;
+            }
+            return applyDirectOnlyOverloadFallback(sourceID, soundPos, playerPos, category, sound, auxOnly, context, decisionReason, gameTime, scene);
+        } catch (Throwable throwable) {
+            Loggers.warn("SPRA OVERLOAD_FALLBACK_FAILED source={} sound={} reason={} error={}", sourceID, sound, decisionReason, throwable.getMessage());
+            return false;
+        }
+    }
+
+    static boolean applyDirectOnlyOverloadFallbackForTests(
+            int sourceID,
+            Vec3 soundPos,
+            Vec3 playerPos,
+            @Nullable SoundSource category,
+            @Nullable ResourceLocation sound,
+            boolean auxOnly,
+            SoundPhysicsSoundPolicy.SoundContext context,
+            SoundPhysicsSoundPolicy.DecisionReason decisionReason,
+            long gameTime,
+            AcousticScene scene
+    ) {
+        return applyDirectOnlyOverloadFallback(sourceID, soundPos, playerPos, category, sound, auxOnly, context, decisionReason, gameTime, scene);
+    }
+
+    private static boolean applyDirectOnlyOverloadFallback(
+            int sourceID,
+            Vec3 soundPos,
+            Vec3 playerPos,
+            @Nullable SoundSource category,
+            @Nullable ResourceLocation sound,
+            boolean auxOnly,
+            SoundPhysicsSoundPolicy.SoundContext context,
+            SoundPhysicsSoundPolicy.DecisionReason decisionReason,
+            long gameTime,
+            AcousticScene scene
+    ) {
+        double occlusion = Math.min(runOcclusion(scene, soundPos, playerPos), SoundPhysicsMod.CONFIG.maxOcclusion.get());
+        float absorptionCoeff = (float) (SoundPhysicsMod.CONFIG.blockAbsorption.get() * 3D);
+        float directCutoff = (float) Math.exp(-occlusion * absorptionCoeff);
+        float directGain = auxOnly ? 0F : (float) Math.pow(directCutoff, 0.1D);
+        AcousticBlockRef soundBlock = scene.blockAt(soundPos);
+        boolean sourceIsUnderwater = soundBlock.fluidState().is(FluidTags.WATER);
+        if ((minecraft != null && minecraft.player != null && minecraft.player.isUnderWater()) || sourceIsUnderwater) {
+            directCutoff *= 1F - SoundPhysicsMod.CONFIG.underwaterFilter.get();
+        }
+
+        EnvironmentParameters environment = new EnvironmentParameters(
+                0F,
+                0F,
+                0F,
+                0F,
+                1F,
+                1F,
+                1F,
+                1F,
+                directCutoff,
+                directGain,
+                SoundPhysicsMod.CONFIG.airAbsorption.get()
+        );
+        if (!applyEnvironmentToSource(sourceID, environment, category, sound)) {
+            return false;
+        }
+
+        storeAcousticEnvironmentSnapshot(environment, soundPos, sound, category, gameTime);
+        SoundPhysicsPolicyDiagnostics.recordOverloadFallbackDirectOnlyApplied();
+        Loggers.log(
+                "SPRA OVERLOAD_FALLBACK_APPLIED source={} sound={} reason={} fallback=direct_only occlusion={} cutoff={} gain={}",
+                sourceID,
+                sound,
+                decisionReason,
+                occlusion,
+                directCutoff,
+                directGain
+        );
+        if (SoundPhysicsSoundPolicy.isKnownPropeller(context) && (directCutoff < 0.99F || directGain < 0.99F)) {
+            SoundPhysicsPolicyDiagnostics.recordPropellerMuffledOrFiltered();
+        }
+        return true;
+    }
+
+    static boolean applyCachedOverloadFallbackForTests(
+            int sourceID,
+            Vec3 soundPos,
+            @Nullable SoundSource category,
+            @Nullable ResourceLocation sound,
+            SoundPhysicsSoundPolicy.SoundContext context,
+            SoundPhysicsSoundPolicy.DecisionReason decisionReason,
+            long gameTime
+    ) {
+        return applyCachedOverloadFallback(sourceID, soundPos, category, sound, context, decisionReason, gameTime);
+    }
+
+    private static long currentClientGameTime() {
+        return minecraft != null && minecraft.level != null ? minecraft.level.getGameTime() : Long.MIN_VALUE;
     }
 
     public static boolean isAmbientSound(@Nullable ResourceLocation sound) {
@@ -885,7 +1091,7 @@ public class SoundPhysics {
         return new Vec3(x, y, z);
     }
 
-    private static double calculateOcclusion(AcousticScene scene, Vec3 soundPos, Vec3 playerPos, SoundSource category, ResourceLocation sound) {
+    private static double calculateOcclusion(int sourceID, AcousticScene scene, Vec3 soundPos, Vec3 playerPos, SoundSource category, ResourceLocation sound) {
         long startNanos = System.nanoTime();
         SoundPhysicsTrace.recordCalculateOcclusion(soundPos, playerPos, category, sound);
         try {
@@ -905,34 +1111,44 @@ public class SoundPhysics {
                 NonStrictOcclusionSelection selection = selectNonStrictOcclusion(directOcclusion, new double[0]);
                 SoundPhysicsTrace.recordNonStrictSelectedDirect();
                 logNonStrictOcclusionDecision(sound, category, directOcclusion, selection.selectedOcclusion(), new double[0], selection, variationFactor);
+                logRawOcclusionTraceIfSuspicious(sourceID, scene, sound, category, soundPos, playerPos, directOcclusion, selection.selectedOcclusion(), new double[0], selection);
                 return 0.0D;
             }
 
-            double[] variationSamples = variationFactor > 0D ? new double[8] : new double[0];
-            int sampleIndex = 0;
-            if (variationFactor > 0D) {
-                for (int x = -1; x <= 1; x += 2) {
-                    for (int y = -1; y <= 1; y += 2) {
-                        for (int z = -1; z <= 1; z += 2) {
-                            Vec3 offset = new Vec3(x, y, z).scale(variationFactor);
-                            variationSamples[sampleIndex] = runOcclusion(scene, soundPos.add(offset), playerPos);
-                            sampleIndex++;
-                        }
-                    }
-                }
-            }
+            double[] variationSamples = sampleNonStrictVariationOcclusion(scene, soundPos, playerPos, variationFactor);
 
             NonStrictOcclusionSelection selection = selectNonStrictOcclusion(directOcclusion, variationSamples);
             recordNonStrictOcclusionSelection(selection);
             double selectedOcclusion = Math.min(selection.selectedOcclusion(), SoundPhysicsMod.CONFIG.maxOcclusion.get());
             logNonStrictOcclusionDecision(sound, category, directOcclusion, selectedOcclusion, variationSamples, selection, variationFactor);
+            logOcclusionInvariantIfNeeded(sourceID, scene, sound, category, soundPos, playerPos, directOcclusion, selectedOcclusion, variationSamples, selection);
+            logRawOcclusionTraceIfSuspicious(sourceID, scene, sound, category, soundPos, playerPos, directOcclusion, selectedOcclusion, variationSamples, selection);
             return selectedOcclusion;
         } finally {
             SoundPhysicsPerfDiagnostics.recordCalculateOcclusion(System.nanoTime() - startNanos);
         }
     }
 
-    private static double runOcclusion(AcousticScene scene, Vec3 soundPos, Vec3 playerPos) {
+    static double[] sampleNonStrictVariationOcclusion(AcousticScene scene, Vec3 soundPos, Vec3 playerPos, double variationFactor) {
+        if (variationFactor <= 0D) {
+            return new double[0];
+        }
+
+        double[] variationSamples = new double[8];
+        int sampleIndex = 0;
+        for (int x = -1; x <= 1; x += 2) {
+            for (int y = -1; y <= 1; y += 2) {
+                for (int z = -1; z <= 1; z += 2) {
+                    Vec3 offset = new Vec3(x, y, z).scale(variationFactor);
+                    variationSamples[sampleIndex] = runOcclusion(scene, soundPos.add(offset), playerPos);
+                    sampleIndex++;
+                }
+            }
+        }
+        return variationSamples;
+    }
+
+    static double runOcclusion(AcousticScene scene, Vec3 soundPos, Vec3 playerPos) {
         long startNanos = System.nanoTime();
         SoundPhysicsTrace.recordRunOcclusion(soundPos, playerPos);
         try {
@@ -940,7 +1156,30 @@ public class SoundPhysics {
             Vec3 rayOrigin = soundPos;
 
             AcousticBlockRef sourceBlock = scene.blockAt(soundPos);
-            AcousticBlockRef lastBlock = shouldIgnoreSourceBlock(sourceBlock) ? sourceBlock : null;
+            AcousticBlockRef lastBlock;
+            if (shouldIgnoreSourceBlock(sourceBlock)) {
+                lastBlock = sourceBlock;
+            } else {
+                float sourceBlockOcclusion = getConfiguredBlockOcclusion(sourceBlock.blockState());
+                if (sourceBlockOcclusion > OCCLUSION_EPSILON && pointInsideCollisionShape(scene, sourceBlock, soundPos)) {
+                    occlusionAccumulation += sourceBlockOcclusion;
+                    lastBlock = sourceBlock;
+                    rayOrigin = advanceRayOriginToward(rayOrigin, playerPos);
+                    Loggers.logOcclusion(
+                            "Source block occlusion counted block={} occlusion={} soundPos={} advancedRayOrigin={}",
+                            blockId(sourceBlock.blockState()),
+                            sourceBlockOcclusion,
+                            soundPos,
+                            rayOrigin
+                    );
+                    if (occlusionAccumulation > SoundPhysicsMod.CONFIG.maxOcclusion.get()) {
+                        Loggers.logOcclusion("Max occlusion reached from source block");
+                        return occlusionAccumulation;
+                    }
+                } else {
+                    lastBlock = null;
+                }
+            }
 
             for (int i = 0; i < SoundPhysicsMod.CONFIG.maxOcclusionRays.get(); i++) {
                 AcousticRayHit rayHit = scene.rayCast(rayOrigin, playerPos, lastBlock);
@@ -1017,14 +1256,15 @@ public class SoundPhysics {
             positiveVariationSamples++;
         }
 
-        if (zeroSamples >= MIN_OPEN_VARIATION_SAMPLES_TO_OVERRIDE_BLOCKED_DIRECT) {
-            return new NonStrictOcclusionSelection(0.0D, zeroSamples, positiveVariationSamples, "zero_override");
-        }
-
         Arrays.sort(positiveSamples, 0, positiveSamplesIncludingDirect);
         double median = medianSorted(positiveSamples, positiveSamplesIncludingDirect);
-        double selectedOcclusion = Math.min(directOcclusion, median);
-        String decisionKind = selectedOcclusion == directOcclusion ? "direct" : "median_positive";
+        double selectedOcclusion = Math.max(OCCLUSION_EPSILON, Math.min(directOcclusion, median));
+        String decisionKind;
+        if (positiveVariationSamples == 0) {
+            decisionKind = "direct_blocked_authoritative";
+        } else {
+            decisionKind = selectedOcclusion == directOcclusion ? "direct" : "median_positive";
+        }
         return new NonStrictOcclusionSelection(selectedOcclusion, zeroSamples, positiveVariationSamples, decisionKind);
     }
 
@@ -1044,17 +1284,17 @@ public class SoundPhysics {
         if (SoundPhysicsMod.OCCLUSION_CONFIG == null) {
             return false;
         }
-        return SoundPhysicsMod.OCCLUSION_CONFIG.getBlockDefinitionValue(sourceBlockState) <= OCCLUSION_EPSILON;
+        return getConfiguredBlockOcclusion(sourceBlockState) <= OCCLUSION_EPSILON;
     }
 
     private static void recordNonStrictOcclusionSelection(NonStrictOcclusionSelection selection) {
-        if (selection.zeroSamples() >= MIN_OPEN_VARIATION_SAMPLES_TO_OVERRIDE_BLOCKED_DIRECT) {
-            SoundPhysicsTrace.recordNonStrictZeroOutlierAccepted(selection.zeroSamples());
-        } else if (selection.zeroSamples() > 0) {
+        if (selection.zeroSamples() > 0) {
             SoundPhysicsTrace.recordNonStrictZeroOutlierIgnored(selection.zeroSamples());
         }
 
-        if ("direct".equals(selection.decisionKind()) || "direct_open".equals(selection.decisionKind())) {
+        if ("direct".equals(selection.decisionKind())
+                || "direct_open".equals(selection.decisionKind())
+                || "direct_blocked_authoritative".equals(selection.decisionKind())) {
             SoundPhysicsTrace.recordNonStrictSelectedDirect();
         } else if ("median_positive".equals(selection.decisionKind())) {
             SoundPhysicsTrace.recordNonStrictSelectedMedianOrPositive();
@@ -1076,6 +1316,122 @@ public class SoundPhysics {
         );
     }
 
+    private static void logOcclusionInvariantIfNeeded(int sourceID, AcousticScene scene, @Nullable ResourceLocation sound, @Nullable SoundSource category, Vec3 soundPos, Vec3 playerPos, double directOcclusion, double selectedOcclusion, double[] variationSamples, NonStrictOcclusionSelection selection) {
+        if (directOcclusion <= OCCLUSION_EPSILON || selectedOcclusion > OCCLUSION_EPSILON) {
+            return;
+        }
+
+        SourceBlockDiagnostics sourceBlock = sourceBlockDiagnostics(scene, soundPos);
+        Loggers.error(
+                "SPRA OCCLUSION INVARIANT VIOLATION: blocked direct selected open source={} sound={} category={} soundPos={} playerPos={} direct={} selected={} variationSamples={} sourceBlock={} sourceBlockOcclusion={} decision={}",
+                sourceID,
+                sound,
+                category,
+                soundPos,
+                playerPos,
+                directOcclusion,
+                selectedOcclusion,
+                Arrays.toString(variationSamples),
+                sourceBlock.blockId(),
+                sourceBlock.occlusion(),
+                selection.decisionKind()
+        );
+    }
+
+    private static void logRawOcclusionTraceIfSuspicious(int sourceID, AcousticScene scene, @Nullable ResourceLocation sound, @Nullable SoundSource category, Vec3 soundPos, Vec3 playerPos, double directOcclusion, double selectedOcclusion, double[] variationSamples, NonStrictOcclusionSelection selection) {
+        if (selectedOcclusion > OCCLUSION_EPSILON) {
+            return;
+        }
+        if (soundPos.distanceToSqr(playerPos) <= 1D) {
+            return;
+        }
+        if (!DiagnosticRuntimeOverrides.traceLoggingEnabled(SoundPhysicsMod.CONFIG)) {
+            return;
+        }
+        if (!isSuspiciousRawOcclusionSound(sound, category)) {
+            return;
+        }
+
+        SourceBlockDiagnostics sourceBlock = sourceBlockDiagnostics(scene, soundPos);
+        Loggers.warn(
+                "SPRA RAW_OCCLUSION_TRACE sound={} category={} source={} direct={} selected={} samples={} sourceBlock={} sourceBlockOcclusion={} playerPos={} soundPos={} decision={}",
+                sound,
+                category,
+                sourceID,
+                directOcclusion,
+                selectedOcclusion,
+                Arrays.toString(variationSamples),
+                sourceBlock.blockId(),
+                sourceBlock.occlusion(),
+                playerPos,
+                soundPos,
+                selection.decisionKind()
+        );
+    }
+
+    private static boolean isSuspiciousRawOcclusionSound(@Nullable ResourceLocation sound, @Nullable SoundSource category) {
+        if (category == SoundSource.NEUTRAL) {
+            return true;
+        }
+        if (sound == null) {
+            return false;
+        }
+        String soundId = sound.toString();
+        return soundId.contains("chicken") || soundId.contains(":entity.");
+    }
+
+    private static SourceBlockDiagnostics sourceBlockDiagnostics(AcousticScene scene, Vec3 soundPos) {
+        AcousticBlockRef sourceBlock = scene.blockAt(soundPos);
+        BlockState sourceBlockState = sourceBlock.blockState();
+        return new SourceBlockDiagnostics(blockId(sourceBlockState), getConfiguredBlockOcclusion(sourceBlockState));
+    }
+
+    private static String blockId(BlockState blockState) {
+        return BuiltInRegistries.BLOCK.getKey(blockState.getBlock()).toString();
+    }
+
+    private static float getConfiguredBlockOcclusion(BlockState blockState) {
+        if (SoundPhysicsMod.OCCLUSION_CONFIG == null) {
+            return 0F;
+        }
+        return SoundPhysicsMod.OCCLUSION_CONFIG.getBlockDefinitionValue(blockState);
+    }
+
+    private static boolean pointInsideCollisionShape(AcousticScene scene, AcousticBlockRef blockRef, Vec3 worldPosition) {
+        VoxelShape shape = blockRef.blockState().getCollisionShape(blockRef.space(), blockRef.pos(), CollisionContext.empty());
+        if (shape.isEmpty()) {
+            return false;
+        }
+
+        Vec3 localPosition = scene.toLocalPosition(blockRef, worldPosition);
+        double shapeX = localPosition.x - blockRef.pos().getX();
+        double shapeY = localPosition.y - blockRef.pos().getY();
+        double shapeZ = localPosition.z - blockRef.pos().getZ();
+        for (AABB box : shape.toAabbs()) {
+            if (containsWithEpsilon(box, shapeX, shapeY, shapeZ)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsWithEpsilon(AABB box, double x, double y, double z) {
+        return x >= box.minX - RAY_ORIGIN_ADVANCE_EPSILON
+                && x <= box.maxX + RAY_ORIGIN_ADVANCE_EPSILON
+                && y >= box.minY - RAY_ORIGIN_ADVANCE_EPSILON
+                && y <= box.maxY + RAY_ORIGIN_ADVANCE_EPSILON
+                && z >= box.minZ - RAY_ORIGIN_ADVANCE_EPSILON
+                && z <= box.maxZ + RAY_ORIGIN_ADVANCE_EPSILON;
+    }
+
+    private static Vec3 advanceRayOriginToward(Vec3 rayOrigin, Vec3 playerPos) {
+        Vec3 toPlayer = playerPos.subtract(rayOrigin);
+        if (toPlayer.lengthSqr() <= 1.0E-12D) {
+            return rayOrigin;
+        }
+        return rayOrigin.add(toPlayer.normalize().scale(RAY_ORIGIN_ADVANCE_EPSILON));
+    }
+
     private static double medianSorted(double[] sortedValues, int count) {
         int midpoint = count / 2;
         if (count % 2 == 1) {
@@ -1085,6 +1441,96 @@ public class SoundPhysics {
     }
 
     static record NonStrictOcclusionSelection(double selectedOcclusion, int zeroSamples, int positiveSamples, String decisionKind) {
+    }
+
+    private record SourceBlockDiagnostics(String blockId, float occlusion) {
+    }
+
+    static record EnvironmentParameters(
+            float sendGain0,
+            float sendGain1,
+            float sendGain2,
+            float sendGain3,
+            float sendCutoff0,
+            float sendCutoff1,
+            float sendCutoff2,
+            float sendCutoff3,
+            float directCutoff,
+            float directGain,
+            float airAbsorption
+    ) {
+    }
+
+    private record AcousticEnvironmentSnapshot(
+            float sendGain0,
+            float sendGain1,
+            float sendGain2,
+            float sendGain3,
+            float sendCutoff0,
+            float sendCutoff1,
+            float sendCutoff2,
+            float sendCutoff3,
+            float directCutoff,
+            float directGain,
+            float airAbsorption,
+            Vec3 sourcePosition,
+            @Nullable ResourceLocation sound,
+            @Nullable SoundSource category,
+            long gameTime,
+            long createdNanos
+    ) {
+        static AcousticEnvironmentSnapshot create(
+                EnvironmentParameters environment,
+                Vec3 sourcePosition,
+                @Nullable ResourceLocation sound,
+                @Nullable SoundSource category,
+                long gameTime
+        ) {
+            return new AcousticEnvironmentSnapshot(
+                    environment.sendGain0(),
+                    environment.sendGain1(),
+                    environment.sendGain2(),
+                    environment.sendGain3(),
+                    environment.sendCutoff0(),
+                    environment.sendCutoff1(),
+                    environment.sendCutoff2(),
+                    environment.sendCutoff3(),
+                    environment.directCutoff(),
+                    environment.directGain(),
+                    environment.airAbsorption(),
+                    sourcePosition,
+                    sound,
+                    category,
+                    gameTime,
+                    System.nanoTime()
+            );
+        }
+
+        EnvironmentParameters environment() {
+            return new EnvironmentParameters(sendGain0, sendGain1, sendGain2, sendGain3, sendCutoff0, sendCutoff1, sendCutoff2, sendCutoff3, directCutoff, directGain, airAbsorption);
+        }
+
+        boolean matchesExact(@Nullable ResourceLocation requestedSound, @Nullable SoundSource requestedCategory) {
+            return matchesCategory(requestedCategory) && (sound == null ? requestedSound == null : sound.equals(requestedSound));
+        }
+
+        boolean matchesCategory(@Nullable SoundSource requestedCategory) {
+            return category == requestedCategory;
+        }
+
+        long ageTicks(long nowGameTime) {
+            if (gameTime == Long.MIN_VALUE || nowGameTime == Long.MIN_VALUE) {
+                return 0L;
+            }
+            return nowGameTime - gameTime;
+        }
+    }
+
+    private record SnapshotMatch(AcousticEnvironmentSnapshot snapshot, double distance, long ageTicks) {
+    }
+
+    interface EnvironmentBackend {
+        boolean apply(int sourceID, EnvironmentParameters environment, @Nullable SoundSource category, @Nullable ResourceLocation sound);
     }
 
     /**
@@ -1119,6 +1565,103 @@ public class SoundPhysics {
         return null;
     }
 
+    private static void storeAcousticEnvironmentSnapshot(
+            EnvironmentParameters environment,
+            Vec3 sourcePosition,
+            @Nullable ResourceLocation sound,
+            @Nullable SoundSource category,
+            long gameTime
+    ) {
+        AcousticEnvironmentSnapshot snapshot = AcousticEnvironmentSnapshot.create(environment, sourcePosition, sound, category, gameTime);
+        synchronized (ACOUSTIC_ENVIRONMENT_SNAPSHOTS) {
+            ACOUSTIC_ENVIRONMENT_SNAPSHOTS.addLast(snapshot);
+            while (ACOUSTIC_ENVIRONMENT_SNAPSHOTS.size() > ACOUSTIC_ENVIRONMENT_CACHE_MAX_SIZE) {
+                ACOUSTIC_ENVIRONMENT_SNAPSHOTS.removeFirst();
+            }
+        }
+    }
+
+    static void storeEnvironmentSnapshotForTests(
+            EnvironmentParameters environment,
+            Vec3 sourcePosition,
+            @Nullable ResourceLocation sound,
+            @Nullable SoundSource category,
+            long gameTime
+    ) {
+        storeAcousticEnvironmentSnapshot(environment, sourcePosition, sound, category, gameTime);
+    }
+
+    @Nullable
+    private static SnapshotMatch findNearestEnvironmentSnapshot(Vec3 sourcePosition, @Nullable SoundSource category, @Nullable ResourceLocation sound, long gameTime) {
+        @Nullable SnapshotMatch exact = null;
+        @Nullable SnapshotMatch categoryMatch = null;
+        synchronized (ACOUSTIC_ENVIRONMENT_SNAPSHOTS) {
+            for (AcousticEnvironmentSnapshot snapshot : ACOUSTIC_ENVIRONMENT_SNAPSHOTS) {
+                @Nullable SnapshotMatch match = matchSnapshot(snapshot, sourcePosition, category, gameTime);
+                if (match == null) {
+                    continue;
+                }
+                if (snapshot.matchesExact(sound, category)) {
+                    exact = nearestSnapshot(exact, match);
+                    continue;
+                }
+                if (snapshot.matchesCategory(category)) {
+                    categoryMatch = nearestSnapshot(categoryMatch, match);
+                }
+            }
+        }
+        return exact != null ? exact : categoryMatch;
+    }
+
+    @Nullable
+    private static SnapshotMatch matchSnapshot(AcousticEnvironmentSnapshot snapshot, Vec3 sourcePosition, @Nullable SoundSource category, long gameTime) {
+        if (!snapshot.matchesCategory(category)) {
+            return null;
+        }
+        long ageTicks = snapshot.ageTicks(gameTime);
+        if (ageTicks < 0L || ageTicks > ACOUSTIC_ENVIRONMENT_CACHE_TTL_TICKS) {
+            return null;
+        }
+        double distanceSqr = snapshot.sourcePosition().distanceToSqr(sourcePosition);
+        if (distanceSqr > ACOUSTIC_ENVIRONMENT_CACHE_RADIUS_SQR) {
+            return null;
+        }
+        return new SnapshotMatch(snapshot, Math.sqrt(distanceSqr), ageTicks);
+    }
+
+    private static SnapshotMatch nearestSnapshot(@Nullable SnapshotMatch current, SnapshotMatch candidate) {
+        if (current == null || candidate.distance() < current.distance()) {
+            return candidate;
+        }
+        if (candidate.distance() == current.distance() && candidate.ageTicks() < current.ageTicks()) {
+            return candidate;
+        }
+        return current;
+    }
+
+    private static boolean applyEnvironmentToSource(
+            int sourceID,
+            EnvironmentParameters environment,
+            @Nullable SoundSource category,
+            @Nullable ResourceLocation sound
+    ) {
+        return environmentBackend.apply(sourceID, environment, category, sound);
+    }
+
+    static void setEnvironmentBackendForTests(EnvironmentBackend backend) {
+        environmentBackend = backend == null ? OPEN_AL_ENVIRONMENT_BACKEND : backend;
+    }
+
+    static void resetEnvironmentBackendForTests() {
+        environmentBackend = OPEN_AL_ENVIRONMENT_BACKEND;
+    }
+
+    static void resetOverloadFallbackForTests() {
+        synchronized (ACOUSTIC_ENVIRONMENT_SNAPSHOTS) {
+            ACOUSTIC_ENVIRONMENT_SNAPSHOTS.clear();
+        }
+    }
+
     public static void setDefaultEnvironment(int sourceID) {
         setDefaultEnvironment(sourceID, false);
     }
@@ -1132,54 +1675,59 @@ public class SoundPhysics {
     }
 
     public static void setEnvironment(int sourceID, float sendGain0, float sendGain1, float sendGain2, float sendGain3, float sendCutoff0, float sendCutoff1, float sendCutoff2, float sendCutoff3, float directCutoff, float directGain, float airAbsorption) {
+        applyEnvironmentToSource(sourceID, new EnvironmentParameters(sendGain0, sendGain1, sendGain2, sendGain3, sendCutoff0, sendCutoff1, sendCutoff2, sendCutoff3, directCutoff, directGain, airAbsorption), lastSoundCategory, lastSound);
+    }
+
+    private static boolean applyOpenAlEnvironment(int sourceID, EnvironmentParameters environment, @Nullable SoundSource category, @Nullable ResourceLocation sound) {
         if (!DiagnosticRuntimeOverrides.soundPhysicsEnabled(SoundPhysicsMod.CONFIG)) {
-            return;
+            return false;
         }
-        if (!AudioSourceRecovery.safeSourceExists(sourceID, lastSoundCategory, lastSound, "setEnvironment")) {
+        if (!AudioSourceRecovery.safeSourceExists(sourceID, category, sound, "setEnvironment")) {
             RecordDiagnostics.markSourceInvalidated(sourceID, "source invalidated after volume/audio change; waiting for new source");
-            return;
+            return false;
         }
         // Set reverb send filter values and set source to send to all reverb fx slots
 
         if (maxAuxSends >= 4) {
-            EXTEfx.alFilterf(sendFilter0, EXTEfx.AL_LOWPASS_GAIN, sendGain0);
-            EXTEfx.alFilterf(sendFilter0, EXTEfx.AL_LOWPASS_GAINHF, sendCutoff0);
+            EXTEfx.alFilterf(sendFilter0, EXTEfx.AL_LOWPASS_GAIN, environment.sendGain0());
+            EXTEfx.alFilterf(sendFilter0, EXTEfx.AL_LOWPASS_GAINHF, environment.sendCutoff0());
             AL11.alSource3i(sourceID, EXTEfx.AL_AUXILIARY_SEND_FILTER, auxFXSlot0, 3, sendFilter0);
             Loggers.logALError("Set environment filter0:");
         }
 
         if (maxAuxSends >= 3) {
-            EXTEfx.alFilterf(sendFilter1, EXTEfx.AL_LOWPASS_GAIN, sendGain1);
-            EXTEfx.alFilterf(sendFilter1, EXTEfx.AL_LOWPASS_GAINHF, sendCutoff1);
+            EXTEfx.alFilterf(sendFilter1, EXTEfx.AL_LOWPASS_GAIN, environment.sendGain1());
+            EXTEfx.alFilterf(sendFilter1, EXTEfx.AL_LOWPASS_GAINHF, environment.sendCutoff1());
             AL11.alSource3i(sourceID, EXTEfx.AL_AUXILIARY_SEND_FILTER, auxFXSlot1, 2, sendFilter1);
             Loggers.logALError("Set environment filter1:");
         }
 
         if (maxAuxSends >= 2) {
-            EXTEfx.alFilterf(sendFilter2, EXTEfx.AL_LOWPASS_GAIN, sendGain2);
-            EXTEfx.alFilterf(sendFilter2, EXTEfx.AL_LOWPASS_GAINHF, sendCutoff2);
+            EXTEfx.alFilterf(sendFilter2, EXTEfx.AL_LOWPASS_GAIN, environment.sendGain2());
+            EXTEfx.alFilterf(sendFilter2, EXTEfx.AL_LOWPASS_GAINHF, environment.sendCutoff2());
             AL11.alSource3i(sourceID, EXTEfx.AL_AUXILIARY_SEND_FILTER, auxFXSlot2, 1, sendFilter2);
             Loggers.logALError("Set environment filter2:");
         }
 
         if (maxAuxSends >= 1) {
-            EXTEfx.alFilterf(sendFilter3, EXTEfx.AL_LOWPASS_GAIN, sendGain3);
-            EXTEfx.alFilterf(sendFilter3, EXTEfx.AL_LOWPASS_GAINHF, sendCutoff3);
+            EXTEfx.alFilterf(sendFilter3, EXTEfx.AL_LOWPASS_GAIN, environment.sendGain3());
+            EXTEfx.alFilterf(sendFilter3, EXTEfx.AL_LOWPASS_GAINHF, environment.sendCutoff3());
             AL11.alSource3i(sourceID, EXTEfx.AL_AUXILIARY_SEND_FILTER, auxFXSlot3, 0, sendFilter3);
             Loggers.logALError("Set environment filter3:");
         }
 
-        EXTEfx.alFilterf(directFilter0, EXTEfx.AL_LOWPASS_GAIN, directGain);
-        EXTEfx.alFilterf(directFilter0, EXTEfx.AL_LOWPASS_GAINHF, directCutoff);
+        EXTEfx.alFilterf(directFilter0, EXTEfx.AL_LOWPASS_GAIN, environment.directGain());
+        EXTEfx.alFilterf(directFilter0, EXTEfx.AL_LOWPASS_GAINHF, environment.directCutoff());
         AL11.alSourcei(sourceID, EXTEfx.AL_DIRECT_FILTER, directFilter0);
         Loggers.logALError("Set environment directFilter0:");
 
-        AL11.alSourcef(sourceID, EXTEfx.AL_AIR_ABSORPTION_FACTOR, Math.max(0.0F, airAbsorption));
+        AL11.alSourcef(sourceID, EXTEfx.AL_AIR_ABSORPTION_FACTOR, Math.max(0.0F, environment.airAbsorption()));
         Loggers.logALError("Set environment airAbsorption:");
+        return true;
     }
 
-    private static void setSoundPos(int sourceID, Vec3 pos) {
-        AudioSourceRecovery.safeSetSource3f(sourceID, AL11.AL_POSITION, (float) pos.x, (float) pos.y, (float) pos.z, lastSoundCategory, lastSound, "set sound position");
+    private static void setSoundPos(int sourceID, Vec3 pos, @Nullable SoundSource category, @Nullable ResourceLocation sound) {
+        AudioSourceRecovery.safeSetSource3f(sourceID, AL11.AL_POSITION, (float) pos.x, (float) pos.y, (float) pos.z, category, sound, "set sound position");
     }
 
     /*

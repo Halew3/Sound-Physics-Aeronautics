@@ -5,15 +5,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class SoundPhysicsTraceTest {
 
     private static final ResourceLocation SOUND = ResourceLocation.fromNamespaceAndPath("minecraft", "block.note_block.pling");
+    private static final ResourceLocation CHICKEN = ResourceLocation.fromNamespaceAndPath("minecraft", "entity.chicken.step");
+    private static final ResourceLocation COD = ResourceLocation.fromNamespaceAndPath("minecraft", "entity.cod.ambient");
+    private static final Vec3 SOURCE_POS = new Vec3(-52.75D, 76.0D, -373.625D);
+
+    private com.sonicether.soundphysics.config.SoundPhysicsConfig previousConfig;
 
     @BeforeEach
     void reset() {
+        previousConfig = SoundPhysicsMod.CONFIG;
+        SoundPhysicsMod.CONFIG = null;
+        SoundPhysicsTrace.reset();
+    }
+
+    @AfterEach
+    void restore() {
+        SoundPhysicsMod.CONFIG = previousConfig;
         SoundPhysicsTrace.reset();
     }
 
@@ -43,27 +57,53 @@ class SoundPhysicsTraceTest {
         assertTrue(resetSummary.contains("soundEnginePlayHead=0"));
         assertTrue(resetSummary.contains("processPaths(sourceMixin=0, soundEngineFallback=0, movingSoundUpdate=0"));
         assertTrue(resetSummary.contains("duplicateSkips(total=0"));
+        assertTrue(resetSummary.contains("sourceContextMismatches=0"));
     }
 
     @Test
     void nonStrictOcclusionCountersSummarizeAndReset() {
         SoundPhysicsTrace.recordNonStrictZeroOutlierIgnored(2);
-        SoundPhysicsTrace.recordNonStrictZeroOutlierAccepted(3);
         SoundPhysicsTrace.recordNonStrictSelectedDirect();
         SoundPhysicsTrace.recordNonStrictSelectedMedianOrPositive();
 
         String summary = SoundPhysicsTrace.diagnosticsSummaryText();
         assertTrue(summary.contains("nonStrictZeroOutlierIgnored=2"));
-        assertTrue(summary.contains("nonStrictZeroOutlierAccepted=3"));
         assertTrue(summary.contains("nonStrictSelectedDirect=1"));
         assertTrue(summary.contains("nonStrictSelectedMedianOrPositive=1"));
 
         SoundPhysicsTrace.reset();
         String resetSummary = SoundPhysicsTrace.diagnosticsSummaryText();
         assertTrue(resetSummary.contains("nonStrictZeroOutlierIgnored=0"));
-        assertTrue(resetSummary.contains("nonStrictZeroOutlierAccepted=0"));
         assertTrue(resetSummary.contains("nonStrictSelectedDirect=0"));
         assertTrue(resetSummary.contains("nonStrictSelectedMedianOrPositive=0"));
+    }
+
+    @Test
+    void explicitSourceMixinContextDoesNotUseOverwrittenGlobalLastSound() {
+        SoundPhysics.setLastSoundContext(SoundSource.NEUTRAL, CHICKEN, "test.ChickenSound", false, false, false);
+        SoundPhysicsSoundPolicy.SoundContext sourceMixinContext = SoundPhysics.getLastSoundContext();
+        SoundPhysics.setLastSoundContext(SoundSource.AMBIENT, COD, "test.CodSound", false, false, false);
+
+        SoundPhysicsTrace.recordSourceMixinProcessExpected(1, SOURCE_POS, sourceMixinContext.category(), sourceMixinContext.soundId());
+        SoundPhysics.onPlaySound(SOURCE_POS.x, SOURCE_POS.y, SOURCE_POS.z, 1, sourceMixinContext.category(), sourceMixinContext.soundId(), sourceMixinContext);
+
+        String summary = SoundPhysicsTrace.diagnosticsSummaryText();
+        assertTrue(summary.contains("processSound=1"));
+        assertTrue(summary.contains("sourceContextMismatches=0"));
+    }
+
+    @Test
+    void legacyGlobalLastSoundRaceIsCountedAsSourceContextMismatch() {
+        SoundPhysics.setLastSoundContext(SoundSource.NEUTRAL, CHICKEN, "test.ChickenSound", false, false, false);
+        SoundPhysicsSoundPolicy.SoundContext sourceMixinContext = SoundPhysics.getLastSoundContext();
+        SoundPhysics.setLastSoundContext(SoundSource.AMBIENT, COD, "test.CodSound", false, false, false);
+
+        SoundPhysicsTrace.recordSourceMixinProcessExpected(1, SOURCE_POS, sourceMixinContext.category(), sourceMixinContext.soundId());
+        SoundPhysics.onPlaySound(SOURCE_POS.x, SOURCE_POS.y, SOURCE_POS.z, 1);
+
+        String summary = SoundPhysicsTrace.diagnosticsSummaryText();
+        assertTrue(summary.contains("processSound=1"));
+        assertTrue(summary.contains("sourceContextMismatches=1"));
     }
 
 }

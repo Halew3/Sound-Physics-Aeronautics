@@ -1,5 +1,6 @@
 package com.sonicether.soundphysics;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nullable;
@@ -26,7 +27,6 @@ public final class SoundPhysicsTrace {
     private static final AtomicLong calculateOcclusionCalls = new AtomicLong();
     private static final AtomicLong runOcclusionCalls = new AtomicLong();
     private static final AtomicLong nonStrictZeroOutlierIgnored = new AtomicLong();
-    private static final AtomicLong nonStrictZeroOutlierAccepted = new AtomicLong();
     private static final AtomicLong nonStrictSelectedDirect = new AtomicLong();
     private static final AtomicLong nonStrictSelectedMedianOrPositive = new AtomicLong();
     private static final AtomicLong rootRayHits = new AtomicLong();
@@ -50,6 +50,8 @@ public final class SoundPhysicsTrace {
     private static final AtomicLong sourceMixinDuplicateSkips = new AtomicLong();
     private static final AtomicLong soundEngineFallbackDuplicateSkips = new AtomicLong();
     private static final AtomicLong movingSoundUpdateDuplicateSkips = new AtomicLong();
+    private static final AtomicLong sourceContextMismatches = new AtomicLong();
+    private static final ThreadLocal<ExpectedSourceMixinProcess> expectedSourceMixinProcess = new ThreadLocal<>();
 
     private SoundPhysicsTrace() {
     }
@@ -129,6 +131,10 @@ public final class SoundPhysicsTrace {
         Loggers.logTrace("SourceMixin.play called source={} pos={} category={} sound={}", sourceId, position, category, sound);
     }
 
+    public static void recordSourceMixinProcessExpected(int sourceId, Vec3 position, @Nullable SoundSource category, @Nullable ResourceLocation sound) {
+        expectedSourceMixinProcess.set(new ExpectedSourceMixinProcess(sourceId, position, category, sound));
+    }
+
     public static void recordOnPlaySound(int sourceId, double posX, double posY, double posZ, @Nullable SoundSource category, @Nullable ResourceLocation sound) {
         onPlaySoundCalls.incrementAndGet();
         Loggers.logTrace("SoundPhysics.onPlaySound called source={} pos=({}, {}, {}) category={} sound={}", sourceId, posX, posY, posZ, category, sound);
@@ -137,6 +143,7 @@ public final class SoundPhysicsTrace {
     public static void recordProcessSound(int sourceId, double posX, double posY, double posZ, @Nullable SoundSource category, @Nullable ResourceLocation sound, boolean auxOnly) {
         processSoundCalls.incrementAndGet();
         RuntimeLoggingController.recordSound(sound);
+        recordSourceContextMismatchIfNeeded(sourceId, posX, posY, posZ, category, sound);
         Loggers.logTrace("SoundPhysics.processSound entered source={} pos=({}, {}, {}) category={} sound={} auxOnly={}", sourceId, posX, posY, posZ, category, sound, auxOnly);
     }
 
@@ -194,13 +201,6 @@ public final class SoundPhysicsTrace {
         nonStrictZeroOutlierIgnored.addAndGet(count);
     }
 
-    public static void recordNonStrictZeroOutlierAccepted(int count) {
-        if (count <= 0) {
-            return;
-        }
-        nonStrictZeroOutlierAccepted.addAndGet(count);
-    }
-
     public static void recordNonStrictSelectedDirect() {
         nonStrictSelectedDirect.incrementAndGet();
     }
@@ -255,6 +255,7 @@ public final class SoundPhysicsTrace {
                 + ", movingSoundUpdate=" + movingSoundUpdateDuplicateSkips.get() + "))"
                 + ", onPlaySound=" + onPlaySoundCalls.get()
                 + ", processSound=" + processSoundCalls.get()
+                + ", sourceContextMismatches=" + sourceContextMismatches.get()
                 + ", processSoundDisabledSkips=" + processSoundDisabledSkips.get()
                 + ", evaluateEnvironment=" + evaluateEnvironmentCalls.get()
                 + ", evaluateEnvironmentSkips=" + evaluateEnvironmentSkips.get()
@@ -266,7 +267,6 @@ public final class SoundPhysicsTrace {
                 + ", calculateOcclusion=" + calculateOcclusionCalls.get()
                 + ", runOcclusion=" + runOcclusionCalls.get()
                 + ", nonStrictOcclusion(nonStrictZeroOutlierIgnored=" + nonStrictZeroOutlierIgnored.get()
-                + ", nonStrictZeroOutlierAccepted=" + nonStrictZeroOutlierAccepted.get()
                 + ", nonStrictSelectedDirect=" + nonStrictSelectedDirect.get()
                 + ", nonStrictSelectedMedianOrPositive=" + nonStrictSelectedMedianOrPositive.get() + ")"
                 + ", rootRays(hit=" + rootRayHits.get() + ", miss=" + rootRayMisses.get() + ")"
@@ -289,7 +289,6 @@ public final class SoundPhysicsTrace {
         calculateOcclusionCalls.set(0L);
         runOcclusionCalls.set(0L);
         nonStrictZeroOutlierIgnored.set(0L);
-        nonStrictZeroOutlierAccepted.set(0L);
         nonStrictSelectedDirect.set(0L);
         nonStrictSelectedMedianOrPositive.set(0L);
         rootRayHits.set(0L);
@@ -309,6 +308,56 @@ public final class SoundPhysicsTrace {
         sourceMixinDuplicateSkips.set(0L);
         soundEngineFallbackDuplicateSkips.set(0L);
         movingSoundUpdateDuplicateSkips.set(0L);
+        sourceContextMismatches.set(0L);
+        expectedSourceMixinProcess.remove();
+    }
+
+    private static void recordSourceContextMismatchIfNeeded(int sourceId, double posX, double posY, double posZ, @Nullable SoundSource category, @Nullable ResourceLocation sound) {
+        ExpectedSourceMixinProcess expected = expectedSourceMixinProcess.get();
+        if (expected == null) {
+            return;
+        }
+        if (!expected.matchesPosition(sourceId, posX, posY, posZ)) {
+            return;
+        }
+        expectedSourceMixinProcess.remove();
+        if (expected.matchesContext(category, sound)) {
+            return;
+        }
+
+        sourceContextMismatches.incrementAndGet();
+        Loggers.warn(
+                "SPRA SOURCE_CONTEXT_MISMATCH source={} sourceMixinSound={} processSoundSound={} sourceMixinCategory={} processSoundCategory={} pos=({}, {}, {})",
+                sourceId,
+                expected.sound(),
+                sound,
+                expected.category(),
+                category,
+                posX,
+                posY,
+                posZ
+        );
+    }
+
+    private record ExpectedSourceMixinProcess(
+            int sourceId,
+            Vec3 position,
+            @Nullable SoundSource category,
+            @Nullable ResourceLocation sound
+    ) {
+        private static final double POSITION_EPSILON_SQR = 1.0E-12D;
+
+        boolean matchesPosition(int actualSourceId, double posX, double posY, double posZ) {
+            double dx = position.x - posX;
+            double dy = position.y - posY;
+            double dz = position.z - posZ;
+            return sourceId == actualSourceId
+                    && dx * dx + dy * dy + dz * dz <= POSITION_EPSILON_SQR;
+        }
+
+        boolean matchesContext(@Nullable SoundSource actualCategory, @Nullable ResourceLocation actualSound) {
+            return category == actualCategory && Objects.equals(sound, actualSound);
+        }
     }
 
     private static String sceneType(@Nullable Object scene) {

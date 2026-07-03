@@ -25,6 +25,7 @@ public final class ConfigDiagnostics {
     public static List<String> configPathLines(Path gameDirectory, Path configFolder) {
         Path soundPhysicsConfigPath = soundPhysicsConfigPath(configFolder);
         List<String> lines = new ArrayList<>();
+        lines.add("SPRA_PATCH_ID=" + SoundPhysicsMod.SPRA_PATCH_ID);
         lines.add("Game directory: " + gameDirectory.toAbsolutePath());
         lines.add("Config folder: " + configFolder.toAbsolutePath());
         lines.add("Sound Physics config folder: " + configDirectory(configFolder).toAbsolutePath());
@@ -168,10 +169,11 @@ public final class ConfigDiagnostics {
     public static String criticalValuesSummary() {
         SoundPhysicsConfig config = SoundPhysicsMod.CONFIG;
         if (config == null) {
-            return "mode=" + DiagnosticRuntimeOverrides.mode().commandName() + ", config=not_initialized";
+            return "SPRA_PATCH_ID=" + SoundPhysicsMod.SPRA_PATCH_ID + ", mode=" + DiagnosticRuntimeOverrides.mode().commandName() + ", config=not_initialized";
         }
 
-        return "mode=" + DiagnosticRuntimeOverrides.mode().commandName()
+        return "SPRA_PATCH_ID=" + SoundPhysicsMod.SPRA_PATCH_ID
+                + ", mode=" + DiagnosticRuntimeOverrides.mode().commandName()
                 + ", enabled=" + DiagnosticRuntimeOverrides.soundPhysicsEnabled(config)
                 + ", render_occlusion=" + DiagnosticRuntimeOverrides.renderOcclusion(config)
                 + ", render_sound_bounces=" + DiagnosticRuntimeOverrides.renderSoundBounces(config)
