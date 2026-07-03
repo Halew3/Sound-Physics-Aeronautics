@@ -30,7 +30,11 @@ Vanilla Aeronautics propellers have a sound range of just 48 blocks. SPR Aeronau
 
 They appropriately become softer and more distant with range, turning into a subtle background presence instead of assasulting your ears.
 
+NEW! optional Distant Horizons LOD terrain checks for very far propellers, allowing aircraft behind DH mountains or ridges to sound quieter
+
 Compatibility with other propulsion sounds from addons like Create: Propulsion is planned.
+
+For best results: use (SSRD)[https://modrinth.com/mod/ssrd] and (Distant Horizons)[https://modrinth.com/mod/distanthorizons]
 
 ---
 
@@ -61,6 +65,7 @@ Major changes include:
 
 * Sable sublevel acoustic support
 * long-range propeller audio
+* Distant Horizons far-sound occlusion
 * Doppler support for selected positional sources
 * safer policy handling/compatability with more than 30 popular mods so far
 * catered physics properties for Create and Create Aeronautics blocks with more on the way
@@ -78,6 +83,8 @@ Create
 Create Aeronautics
 Sable
 ```
+
+Optional Distant Horizons integration requires DH version 3.1.2-b or newer. 
 
 Do **not** install Sound Physics Remastered alongside SPR Aeronautics. Use one or the other.
 

@@ -82,6 +82,14 @@ class ConfigDiagnosticsTest {
         assertTrue(dump.contains("propeller_far_field_start_blocks=72.0"));
         assertTrue(dump.contains("propeller_far_cutoff_min=0.28"));
         assertTrue(dump.contains("propeller_far_compensate_high_source_volume=true"));
+        assertTrue(dump.contains("distant_horizons_far_propeller_occlusion_enabled=false"));
+        assertTrue(dump.contains("distant_horizons_far_propeller_min_distance=192.0"));
+        assertTrue(dump.contains("distant_horizons_far_propeller_probe_interval_ticks=20"));
+        assertTrue(dump.contains("distant_horizons_far_propeller_max_strength=0.8"));
+        assertTrue(dump.contains("distant_horizons_far_propeller_gain_at_full_occlusion=0.55"));
+        assertTrue(dump.contains("distant_horizons_far_propeller_cutoff_at_full_occlusion=0.45"));
+        assertTrue(dump.contains("distant_horizons_far_propeller_max_ray_length=2048"));
+        assertTrue(dump.contains("distant_horizons_far_propeller_debug_logging=false"));
         assertTrue(dump.contains("sound_physics_max_sound_starts_per_tick=32"));
         assertTrue(dump.contains("sound_physics_impact_burst_dedupe_apply_to_tickable_sounds=false"));
 
@@ -97,8 +105,11 @@ class ConfigDiagnosticsTest {
         assertTrue(exampleText.contains("propeller_long_range_far_min_gain=0.035"));
         assertTrue(exampleText.contains("propeller_far_source_volume_compensation_strength=1.0"));
         assertTrue(exampleText.contains("propeller_far_field_skip_reverb_after_distance=384.0"));
+        assertTrue(exampleText.contains("distant_horizons_far_propeller_occlusion_enabled=false"));
+        assertTrue(exampleText.contains("distant_horizons_far_propeller_max_ray_length=2048"));
         assertTrue(ConfigDiagnostics.criticalValuesSummary().contains("openal_error_checks=false"));
         assertTrue(ConfigDiagnostics.criticalValuesSummary().contains("adaptive_reflection_budget_enabled=true"));
+        assertTrue(ConfigDiagnostics.criticalValuesSummary().contains("distant_horizons_far_propeller_occlusion_enabled=false"));
     }
 
     private SoundPhysicsConfig config(Path configFolder) {

@@ -22,6 +22,7 @@ import com.sonicether.soundphysics.config.blocksound.BlockDefinition;
 import de.maxhenkel.configbuilder.ConfigBuilder;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.world.level.block.Blocks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,8 +64,8 @@ class BlockSoundDefaultsTest {
         Properties v3ReflectivityProperties = loadResourceProperties(ReflectivityConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
         Properties v3OcclusionProperties = loadResourceProperties(OcclusionConfig.V3_MATERIAL_DEFAULTS_RESOURCE);
 
-        assertEquals(84, reflectivityProperties.stringPropertyNames().size());
-        assertEquals(84, occlusionProperties.stringPropertyNames().size());
+        assertEquals(83, reflectivityProperties.stringPropertyNames().size());
+        assertEquals(83, occlusionProperties.stringPropertyNames().size());
         assertEquals(680, v3ReflectivityProperties.stringPropertyNames().size());
         assertEquals(680, v3OcclusionProperties.stringPropertyNames().size());
     }
@@ -112,8 +113,26 @@ class BlockSoundDefaultsTest {
 
         assertEquals(0.1F, reflectivity.get("#aeronautics:envelope"), 0.0001F);
         assertEquals(1.5F, occlusion.get("#aeronautics:envelope"), 0.0001F);
-        assertEquals(0.2F, reflectivity.get("#create:windmill_sails"), 0.0001F);
-        assertEquals(0.1F, occlusion.get("#create:windmill_sails"), 0.0001F);
+        assertFalse(reflectivity.containsKey("#create:windmill_sails"));
+        assertFalse(occlusion.containsKey("#create:windmill_sails"));
+    }
+
+    @Test
+    void vanillaWoolResolvesThroughWoolSoundTypeDefaults() {
+        ReflectivityConfig reflectivityConfig = new ReflectivityConfig(tempDir.resolve("reflectivity.properties"));
+        OcclusionConfig occlusionConfig = new OcclusionConfig(tempDir.resolve("occlusion.properties"));
+
+        assertEquals(0.1F, reflectivityConfig.getBlockDefinitionValue(Blocks.WHITE_WOOL.defaultBlockState()), 0.0001F);
+        assertEquals(1.5F, occlusionConfig.getBlockDefinitionValue(Blocks.WHITE_WOOL.defaultBlockState()), 0.0001F);
+    }
+
+    @Test
+    void blockAcousticDefaultsDoNotContainBelowMinimumValues() {
+        ReflectivityConfig reflectivityConfig = new ReflectivityConfig(tempDir.resolve("reflectivity.properties"));
+        OcclusionConfig occlusionConfig = new OcclusionConfig(tempDir.resolve("occlusion.properties"));
+
+        assertNoBelowMinimumValues("reflectivity", byConfigString(reflectivityConfig.getBlockDefinitions()));
+        assertNoBelowMinimumValues("occlusion", byConfigString(occlusionConfig.getBlockDefinitions()));
     }
 
     @Test
@@ -155,6 +174,13 @@ class BlockSoundDefaultsTest {
     private Map<String, Float> byConfigString(Map<BlockDefinition, Float> definitions) {
         return definitions.entrySet().stream()
                 .collect(Collectors.toMap(entry -> entry.getKey().getConfigString(), Map.Entry::getValue));
+    }
+
+    private void assertNoBelowMinimumValues(String configName, Map<String, Float> definitions) {
+        Map<String, Float> belowMinimum = definitions.entrySet().stream()
+                .filter(entry -> entry.getValue() >= 0F && entry.getValue() < 0.01F)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        assertEquals(Map.of(), belowMinimum, configName + " contains values below 0.01");
     }
 
 }

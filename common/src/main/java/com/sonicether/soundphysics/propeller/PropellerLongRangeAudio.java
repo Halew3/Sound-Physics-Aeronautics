@@ -15,6 +15,7 @@ import com.sonicether.soundphysics.Loggers;
 import com.sonicether.soundphysics.SoundPhysicsMod;
 import com.sonicether.soundphysics.SoundPhysicsSoundPolicy;
 import com.sonicether.soundphysics.config.SoundPhysicsConfig;
+import com.sonicether.soundphysics.integration.dh.DistantHorizonsAudioBridge;
 
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.TickableSoundInstance;
@@ -183,6 +184,7 @@ public final class PropellerLongRangeAudio {
                 .toList();
         List<String> lines = new ArrayList<>();
         lines.add("propellerLongRange(" + diagnosticsSummaryText() + ")");
+        lines.add("dhFarPropellerOcclusion(" + DistantHorizonsAudioBridge.diagnosticsSummaryText() + ")");
         if (DiagnosticRuntimeOverrides.propellerSafeMode()) {
             lines.add("safe mode: acoustic/Doppler bypass active; long-range source distance "
                     + (SoundPhysicsMod.CONFIG != null && SoundPhysicsMod.CONFIG.propellerLongRangeApplyInSafeMode.get() ? "applied when sources exist" : "disabled by config"));
@@ -228,12 +230,14 @@ public final class PropellerLongRangeAudio {
         farFieldApplied.set(0L);
         reverbSkipped.set(0L);
         latestSkipReason = "none";
+        DistantHorizonsAudioBridge.resetDiagnostics();
     }
 
     public static int clearAudioStateForRecovery(String reason) {
         int count = SOURCES.size();
         SOURCES.clear();
         latestSkipReason = reason;
+        DistantHorizonsAudioBridge.clearAudioStateForRecovery(reason);
         return count;
     }
 
@@ -249,6 +253,8 @@ public final class PropellerLongRangeAudio {
         SoundPhysicsConfig config = SoundPhysicsMod.CONFIG;
         if (config != null && !config.propellerLongRangeEnabled.get()) {
             clearAudioStateForRecovery("config reload disabled propeller long range");
+        } else {
+            DistantHorizonsAudioBridge.onConfigReload();
         }
     }
 
@@ -257,6 +263,7 @@ public final class PropellerLongRangeAudio {
         resetDiagnostics();
         sourceBackend = OPENAL_SOURCE_BACKEND;
         PropellerAudioProfileResolver.clearReflectionCache();
+        DistantHorizonsAudioBridge.clearForTests();
     }
 
     public static void setSourceBackendForTests(SourceBackend backend) {
@@ -494,8 +501,9 @@ public final class PropellerLongRangeAudio {
                         + " farField=unknown"
                         + " directCutoffMultiplier=unknown"
                         + " directGainMultiplier=unknown"
-                        + " effectiveCutoff=unknown"
-                        + " airAbsorption=unknown";
+                    + " effectiveCutoff=unknown"
+                    + " airAbsorption=unknown"
+                    + DistantHorizonsAudioBridge.diagnosticsFieldsForSource(sourceId);
             }
             return prefix
                     + " distanceKnown=true"
@@ -510,7 +518,8 @@ public final class PropellerLongRangeAudio {
                     + " directCutoffMultiplier=" + format(farFieldEffect.directCutoffMultiplier())
                     + " directGainMultiplier=" + format(farFieldEffect.directGainMultiplier())
                     + " effectiveCutoff=" + format(farFieldEffect.effectiveCutoff())
-                    + " airAbsorption=" + format(farFieldEffect.airAbsorption());
+                    + " airAbsorption=" + format(farFieldEffect.airAbsorption())
+                    + DistantHorizonsAudioBridge.diagnosticsFieldsForSource(sourceId);
         }
 
         private static String shortClassName(@Nullable String className) {

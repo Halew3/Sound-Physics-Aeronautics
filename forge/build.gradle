@@ -22,10 +22,18 @@ processResources {
 
 repositories {
     maven { url = 'https://maven.shedaniel.me/' }
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content {
+            includeGroup 'maven.modrinth'
+        }
+    }
 }
 
 dependencies {
     compileOnly "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
+    compileOnly "maven.modrinth:Xs0XTOVv:${distant_horizons_api_version}"
     implementation "maven.modrinth:simple-voice-chat:forge-${voicechat_version}"
     implementation('net.sf.jopt-simple:jopt-simple:5.0.4') { version { strictly '5.0.4' } }
 }

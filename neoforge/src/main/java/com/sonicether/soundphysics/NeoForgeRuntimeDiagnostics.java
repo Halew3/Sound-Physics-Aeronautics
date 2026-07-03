@@ -1,6 +1,7 @@
 package com.sonicether.soundphysics;
 
 import com.sonicether.soundphysics.doppler.DopplerEngine;
+import com.sonicether.soundphysics.utils.SoundRateManager;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -17,6 +18,12 @@ final class NeoForgeRuntimeDiagnostics {
         RuntimeLoggingController.tick();
         AudioSourceRecovery.tick();
         DopplerEngine.tick();
+
+        var level = Minecraft.getInstance().level;
+        if (level != null) {
+            SoundRateManager.onClientTick(level);
+        }
+
         sendAudioRecoveryNote();
         sendExpiredRecordWatchSummary();
         warnDebugFlagsOnce();

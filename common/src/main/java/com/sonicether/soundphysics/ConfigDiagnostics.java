@@ -148,6 +148,14 @@ public final class ConfigDiagnostics {
         lines.add("propeller_far_compensate_high_source_volume=" + config.propellerFarCompensateHighSourceVolume.get());
         lines.add("propeller_far_source_volume_compensation_strength=" + config.propellerFarSourceVolumeCompensationStrength.get());
         lines.add("propeller_far_field_skip_reverb_after_distance=" + config.propellerFarFieldSkipReverbAfterDistance.get());
+        lines.add("distant_horizons_far_propeller_occlusion_enabled=" + config.distantHorizonsFarPropellerOcclusionEnabled.get());
+        lines.add("distant_horizons_far_propeller_min_distance=" + config.distantHorizonsFarPropellerMinDistance.get());
+        lines.add("distant_horizons_far_propeller_probe_interval_ticks=" + config.distantHorizonsFarPropellerProbeIntervalTicks.get());
+        lines.add("distant_horizons_far_propeller_max_strength=" + config.distantHorizonsFarPropellerMaxStrength.get());
+        lines.add("distant_horizons_far_propeller_gain_at_full_occlusion=" + config.distantHorizonsFarPropellerGainAtFullOcclusion.get());
+        lines.add("distant_horizons_far_propeller_cutoff_at_full_occlusion=" + config.distantHorizonsFarPropellerCutoffAtFullOcclusion.get());
+        lines.add("distant_horizons_far_propeller_max_ray_length=" + config.distantHorizonsFarPropellerMaxRayLength.get());
+        lines.add("distant_horizons_far_propeller_debug_logging=" + config.distantHorizonsFarPropellerDebugLogging.get());
         lines.add("sound_physics_max_sound_starts_per_tick=" + config.soundPhysicsMaxSoundStartsPerTick.get());
         lines.add("sound_physics_max_debug_rays_per_tick=" + config.soundPhysicsMaxDebugRaysPerTick.get());
         lines.add("sound_physics_impact_burst_dedupe_enabled=" + config.soundPhysicsImpactBurstDedupeEnabled.get());
@@ -182,6 +190,7 @@ public final class ConfigDiagnostics {
                 + ", propeller_long_range_profile=" + config.propellerLongRangeProfile.get()
                 + ", propeller_long_range_max_distance=" + config.propellerLongRangeMaxDistance.get()
                 + ", propeller_far_field_enabled=" + config.propellerFarFieldEnabled.get()
+                + ", distant_horizons_far_propeller_occlusion_enabled=" + config.distantHorizonsFarPropellerOcclusionEnabled.get()
                 + ", raw(enabled=" + config.enabled.get()
                 + ", render_occlusion=" + config.renderOcclusion.get()
                 + ", render_sound_bounces=" + config.renderSoundBounces.get()

@@ -115,6 +115,14 @@ public class SoundPhysicsConfig {
     public final ConfigEntry<Boolean> propellerFarCompensateHighSourceVolume;
     public final ConfigEntry<Double> propellerFarSourceVolumeCompensationStrength;
     public final ConfigEntry<Double> propellerFarFieldSkipReverbAfterDistance;
+    public final ConfigEntry<Boolean> distantHorizonsFarPropellerOcclusionEnabled;
+    public final ConfigEntry<Double> distantHorizonsFarPropellerMinDistance;
+    public final ConfigEntry<Integer> distantHorizonsFarPropellerProbeIntervalTicks;
+    public final ConfigEntry<Double> distantHorizonsFarPropellerMaxStrength;
+    public final ConfigEntry<Double> distantHorizonsFarPropellerGainAtFullOcclusion;
+    public final ConfigEntry<Double> distantHorizonsFarPropellerCutoffAtFullOcclusion;
+    public final ConfigEntry<Integer> distantHorizonsFarPropellerMaxRayLength;
+    public final ConfigEntry<Boolean> distantHorizonsFarPropellerDebugLogging;
     public final ConfigEntry<Integer> soundPhysicsMaxSoundStartsPerTick;
     public final ConfigEntry<Integer> soundPhysicsMaxDebugRaysPerTick;
     public final ConfigEntry<Boolean> soundPhysicsImpactBurstDedupeEnabled;
@@ -417,6 +425,22 @@ public class SoundPhysicsConfig {
                 .comment("Blend strength for high source-volume compensation at distance.");
         propellerFarFieldSkipReverbAfterDistance = builder.doubleEntry("propeller_far_field_skip_reverb_after_distance", 384.0D, 0.0D, 4096.0D)
                 .comment("Distance after which propeller processing skips expensive reverb rays and uses direct/far-field filtering only.");
+        distantHorizonsFarPropellerOcclusionEnabled = builder.booleanEntry("distant_horizons_far_propeller_occlusion_enabled", false)
+                .comment("Uses Distant Horizons LOD terrain to softly muffle far eligible propellers behind distant terrain.");
+        distantHorizonsFarPropellerMinDistance = builder.doubleEntry("distant_horizons_far_propeller_min_distance", 192.0D, 0.0D, 4096.0D)
+                .comment("Minimum listener-to-propeller distance before Distant Horizons terrain occlusion may query.");
+        distantHorizonsFarPropellerProbeIntervalTicks = builder.integerEntry("distant_horizons_far_propeller_probe_interval_ticks", 20, 10, 200)
+                .comment("Tick interval for Distant Horizons terrain probes per propeller source.");
+        distantHorizonsFarPropellerMaxStrength = builder.doubleEntry("distant_horizons_far_propeller_max_strength", 0.80D, 0.0D, 1.0D)
+                .comment("Maximum DH terrain occlusion blend strength for far propellers.");
+        distantHorizonsFarPropellerGainAtFullOcclusion = builder.doubleEntry("distant_horizons_far_propeller_gain_at_full_occlusion", 0.55D, 0.0D, 1.0D)
+                .comment("Direct gain multiplier when DH terrain occlusion reaches full configured strength.");
+        distantHorizonsFarPropellerCutoffAtFullOcclusion = builder.doubleEntry("distant_horizons_far_propeller_cutoff_at_full_occlusion", 0.45D, 0.0D, 1.0D)
+                .comment("Direct high-frequency cutoff multiplier when DH terrain occlusion reaches full configured strength.");
+        distantHorizonsFarPropellerMaxRayLength = builder.integerEntry("distant_horizons_far_propeller_max_ray_length", 2048, 1, 8192)
+                .comment("Maximum Distant Horizons terrain ray length in blocks.");
+        distantHorizonsFarPropellerDebugLogging = builder.booleanEntry("distant_horizons_far_propeller_debug_logging", false)
+                .comment("Logs compact Distant Horizons far propeller occlusion probe diagnostics.");
         soundPhysicsMaxSoundStartsPerTick = builder.integerEntry("sound_physics_max_sound_starts_per_tick", 32, 0, Integer.MAX_VALUE)
                 .comment("Maximum acoustic sound starts processed per tick. 0 disables throttling.");
         soundPhysicsMaxDebugRaysPerTick = builder.integerEntry("sound_physics_max_debug_rays_per_tick", 4096, 0, Integer.MAX_VALUE)
