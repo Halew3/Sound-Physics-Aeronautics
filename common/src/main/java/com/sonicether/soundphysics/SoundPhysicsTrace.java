@@ -26,6 +26,10 @@ public final class SoundPhysicsTrace {
     private static final AtomicLong acousticProviderFailures = new AtomicLong();
     private static final AtomicLong calculateOcclusionCalls = new AtomicLong();
     private static final AtomicLong runOcclusionCalls = new AtomicLong();
+    private static final AtomicLong sourceBlockSelfOcclusionApplied = new AtomicLong();
+    private static final AtomicLong sourceBlockSelfOcclusionSkippedBlockSound = new AtomicLong();
+    private static final AtomicLong sourceBlockSelfOcclusionSkippedStepOrBlockEvent = new AtomicLong();
+    private static final AtomicLong sourceBlockSelfOcclusionSkippedBoundary = new AtomicLong();
     private static final AtomicLong nonStrictZeroOutlierIgnored = new AtomicLong();
     private static final AtomicLong nonStrictSelectedDirect = new AtomicLong();
     private static final AtomicLong nonStrictSelectedMedianOrPositive = new AtomicLong();
@@ -50,7 +54,15 @@ public final class SoundPhysicsTrace {
     private static final AtomicLong sourceMixinDuplicateSkips = new AtomicLong();
     private static final AtomicLong soundEngineFallbackDuplicateSkips = new AtomicLong();
     private static final AtomicLong movingSoundUpdateDuplicateSkips = new AtomicLong();
+    private static final AtomicLong soundEngineFallbackSkippedRecentSourceMixin = new AtomicLong();
     private static final AtomicLong sourceContextMismatches = new AtomicLong();
+    private static final AtomicLong preplayRawFilterWarnings = new AtomicLong();
+    private static final AtomicLong preplayFallbackApplied = new AtomicLong();
+    private static final AtomicLong preplayFallbackSkippedNoSnapshot = new AtomicLong();
+    private static final AtomicLong sourceFilterReadbackRawBeforePlay = new AtomicLong();
+    private static final AtomicLong sourceFilterReadbackMuffledBeforePlay = new AtomicLong();
+    private static final AtomicLong overloadFallbackReadbackRaw = new AtomicLong();
+    private static final AtomicLong overloadFallbackReadbackMuffled = new AtomicLong();
     private static final ThreadLocal<ExpectedSourceMixinProcess> expectedSourceMixinProcess = new ThreadLocal<>();
 
     private SoundPhysicsTrace() {
@@ -118,6 +130,11 @@ public final class SoundPhysicsTrace {
             case MOVING_SOUND_UPDATE -> movingSoundUpdateDuplicateSkips.incrementAndGet();
         }
         Loggers.logTrace("Duplicate sound processing skipped path={} source={} sound={}", path.diagnosticName(), sourceId, sound);
+    }
+
+    public static void recordSoundEngineFallbackSkippedRecentSourceMixin(int sourceId, @Nullable ResourceLocation sound) {
+        soundEngineFallbackSkippedRecentSourceMixin.incrementAndGet();
+        Loggers.logTrace("SoundEngine fallback skipped recent SourceMixin start source={} sound={}", sourceId, sound);
     }
 
     public static void recordSourceMixinPlay(int sourceId, @Nullable Vec3 position, @Nullable SoundSource category, @Nullable ResourceLocation sound) {
@@ -194,6 +211,22 @@ public final class SoundPhysicsTrace {
         Loggers.logTrace("runOcclusion called soundPos={} playerPos={}", soundPos, playerPos);
     }
 
+    public static void recordSourceBlockSelfOcclusionApplied() {
+        sourceBlockSelfOcclusionApplied.incrementAndGet();
+    }
+
+    public static void recordSourceBlockSelfOcclusionSkippedBlockSound() {
+        sourceBlockSelfOcclusionSkippedBlockSound.incrementAndGet();
+    }
+
+    public static void recordSourceBlockSelfOcclusionSkippedStepOrBlockEvent() {
+        sourceBlockSelfOcclusionSkippedStepOrBlockEvent.incrementAndGet();
+    }
+
+    public static void recordSourceBlockSelfOcclusionSkippedBoundary() {
+        sourceBlockSelfOcclusionSkippedBoundary.incrementAndGet();
+    }
+
     public static void recordNonStrictZeroOutlierIgnored(int count) {
         if (count <= 0) {
             return;
@@ -234,6 +267,36 @@ public final class SoundPhysicsTrace {
         Loggers.logTrace("Sable ray failure space={} error={}", acousticId, throwable.getMessage());
     }
 
+    public static void recordPreplayRawFilterWarning() {
+        preplayRawFilterWarnings.incrementAndGet();
+    }
+
+    public static void recordPreplayFallbackApplied() {
+        preplayFallbackApplied.incrementAndGet();
+    }
+
+    public static void recordPreplayFallbackSkippedNoSnapshot() {
+        preplayFallbackSkippedNoSnapshot.incrementAndGet();
+    }
+
+    public static void recordSourceFilterReadbackBeforePlay(boolean raw, boolean muffled) {
+        if (raw) {
+            sourceFilterReadbackRawBeforePlay.incrementAndGet();
+        }
+        if (muffled) {
+            sourceFilterReadbackMuffledBeforePlay.incrementAndGet();
+        }
+    }
+
+    public static void recordOverloadFallbackReadback(boolean raw, boolean muffled) {
+        if (raw) {
+            overloadFallbackReadbackRaw.incrementAndGet();
+        }
+        if (muffled) {
+            overloadFallbackReadbackMuffled.incrementAndGet();
+        }
+    }
+
     public static String diagnosticsSummaryText() {
         return "mixin(pluginLoaded=" + mixinConfigLoads.get()
                 + ", shouldApply=" + mixinShouldApplyCalls.get()
@@ -253,6 +316,7 @@ public final class SoundPhysicsTrace {
                 + ", sourceMixin=" + sourceMixinDuplicateSkips.get()
                 + ", soundEngineFallback=" + soundEngineFallbackDuplicateSkips.get()
                 + ", movingSoundUpdate=" + movingSoundUpdateDuplicateSkips.get() + "))"
+                + ", soundEngineFallbackSkippedRecentSourceMixin=" + soundEngineFallbackSkippedRecentSourceMixin.get()
                 + ", onPlaySound=" + onPlaySoundCalls.get()
                 + ", processSound=" + processSoundCalls.get()
                 + ", sourceContextMismatches=" + sourceContextMismatches.get()
@@ -266,9 +330,20 @@ public final class SoundPhysicsTrace {
                 + ", providerFailures=" + acousticProviderFailures.get() + ")"
                 + ", calculateOcclusion=" + calculateOcclusionCalls.get()
                 + ", runOcclusion=" + runOcclusionCalls.get()
+                + ", sourceBlockSelfOcclusion(applied=" + sourceBlockSelfOcclusionApplied.get()
+                + ", skippedBlockSound=" + sourceBlockSelfOcclusionSkippedBlockSound.get()
+                + ", skippedStepOrBlockEvent=" + sourceBlockSelfOcclusionSkippedStepOrBlockEvent.get()
+                + ", skippedBoundary=" + sourceBlockSelfOcclusionSkippedBoundary.get() + ")"
                 + ", nonStrictOcclusion(nonStrictZeroOutlierIgnored=" + nonStrictZeroOutlierIgnored.get()
                 + ", nonStrictSelectedDirect=" + nonStrictSelectedDirect.get()
                 + ", nonStrictSelectedMedianOrPositive=" + nonStrictSelectedMedianOrPositive.get() + ")"
+                + ", preplay(preplayRawFilterWarnings=" + preplayRawFilterWarnings.get()
+                + ", preplayFallbackApplied=" + preplayFallbackApplied.get()
+                + ", preplayFallbackSkippedNoSnapshot=" + preplayFallbackSkippedNoSnapshot.get() + ")"
+                + ", filterReadback(sourceFilterReadbackRawBeforePlay=" + sourceFilterReadbackRawBeforePlay.get()
+                + ", sourceFilterReadbackMuffledBeforePlay=" + sourceFilterReadbackMuffledBeforePlay.get()
+                + ", overloadFallbackReadbackRaw=" + overloadFallbackReadbackRaw.get()
+                + ", overloadFallbackReadbackMuffled=" + overloadFallbackReadbackMuffled.get() + ")"
                 + ", rootRays(hit=" + rootRayHits.get() + ", miss=" + rootRayMisses.get() + ")"
                 + ", sableRays(hit=" + sableRayHits.get() + ", miss=" + sableRayMisses.get() + ", failures=" + sableRayFailures.get() + ")";
     }
@@ -288,6 +363,10 @@ public final class SoundPhysicsTrace {
         acousticProviderFailures.set(0L);
         calculateOcclusionCalls.set(0L);
         runOcclusionCalls.set(0L);
+        sourceBlockSelfOcclusionApplied.set(0L);
+        sourceBlockSelfOcclusionSkippedBlockSound.set(0L);
+        sourceBlockSelfOcclusionSkippedStepOrBlockEvent.set(0L);
+        sourceBlockSelfOcclusionSkippedBoundary.set(0L);
         nonStrictZeroOutlierIgnored.set(0L);
         nonStrictSelectedDirect.set(0L);
         nonStrictSelectedMedianOrPositive.set(0L);
@@ -308,7 +387,15 @@ public final class SoundPhysicsTrace {
         sourceMixinDuplicateSkips.set(0L);
         soundEngineFallbackDuplicateSkips.set(0L);
         movingSoundUpdateDuplicateSkips.set(0L);
+        soundEngineFallbackSkippedRecentSourceMixin.set(0L);
         sourceContextMismatches.set(0L);
+        preplayRawFilterWarnings.set(0L);
+        preplayFallbackApplied.set(0L);
+        preplayFallbackSkippedNoSnapshot.set(0L);
+        sourceFilterReadbackRawBeforePlay.set(0L);
+        sourceFilterReadbackMuffledBeforePlay.set(0L);
+        overloadFallbackReadbackRaw.set(0L);
+        overloadFallbackReadbackMuffled.set(0L);
         expectedSourceMixinProcess.remove();
     }
 

@@ -10,6 +10,8 @@ import com.sonicether.soundphysics.SoundProcessingDeduper;
 import com.sonicether.soundphysics.SoundPhysicsTrace;
 import com.sonicether.soundphysics.doppler.DopplerEngine;
 import com.sonicether.soundphysics.propeller.PropellerLongRangeAudio;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.openal.AL10;
 import org.spongepowered.asm.mixin.Final;
@@ -21,6 +23,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import javax.annotation.Nullable;
+
 @Mixin(Channel.class)
 public class SourceMixin {
 
@@ -30,6 +34,22 @@ public class SourceMixin {
 
     @Unique
     private Vec3 pos;
+
+    @Unique
+    @Nullable
+    private Vec3 spra$playPosition;
+
+    @Unique
+    @Nullable
+    private SoundSource spra$playCategory;
+
+    @Unique
+    @Nullable
+    private ResourceLocation spra$playSound;
+
+    @Unique
+    @Nullable
+    private SoundPhysicsSoundPolicy.SoundContext spra$playContext;
 
     @Inject(method = "setSelfPosition", at = @At("HEAD"))
     private void setSelfPosition(Vec3 poss, CallbackInfo ci) {
@@ -42,6 +62,10 @@ public class SourceMixin {
         var context = SoundPhysics.getLastSoundContext();
         var category = context.category();
         var sound = context.soundId();
+        this.spra$playPosition = pos;
+        this.spra$playCategory = category;
+        this.spra$playSound = sound;
+        this.spra$playContext = context;
         SoundPhysicsTrace.recordChannelPlayHead(source, pos, category, sound);
         SoundPhysicsTrace.recordSourceMixinPlay(source, pos, category, sound);
         if (pos == null) {
@@ -51,6 +75,7 @@ public class SourceMixin {
             Loggers.warn("SourceMixin.play skipped source {} because the last sound context was not captured", source);
             return;
         }
+        SoundPhysics.beforeProcessSourceStart(source, pos, category, sound, context);
         if (!SoundProcessingDeduper.shouldProcessStart(
                 source,
                 SoundProcessingDeduper.currentGameTime(),
@@ -63,11 +88,22 @@ public class SourceMixin {
         SoundPhysicsTrace.recordProcessingPath(SoundProcessingDeduper.ProcessingPath.SOURCE_MIXIN, source, sound);
         SoundPhysicsTrace.recordSourceMixinProcessExpected(source, pos, category, sound);
         SoundPhysics.onPlaySound(pos.x, pos.y, pos.z, source, category, sound, context);
+        SoundProcessingDeduper.recordSourceMixinStartProcessed(source, sound, category, pos, System.nanoTime());
         if (SoundPhysicsSoundPolicy.isKnownPropeller(context)) {
             PropellerLongRangeAudio.applyFallbackSourceRange(source, context, 1.6F, 1.0F);
         }
         DopplerEngine.onPlaySource(source, pos, category, sound, context.relative(), context.noAttenuation(), context.soundInstanceClassName(), context.streaming(), context.tickable());
         Loggers.logALError("Sound play injector");
+    }
+
+    @Inject(method = "play", at = @At(value = "INVOKE", target = "Lorg/lwjgl/openal/AL10;alSourcePlay(I)V"))
+    private void beforeAlSourcePlay(CallbackInfo ci) {
+        SoundPhysics.beforeAlSourcePlay(source, spra$playPosition, spra$playCategory, spra$playSound, spra$playContext);
+    }
+
+    @Inject(method = "play", at = @At(value = "INVOKE", target = "Lorg/lwjgl/openal/AL10;alSourcePlay(I)V", shift = At.Shift.AFTER))
+    private void afterAlSourcePlay(CallbackInfo ci) {
+        SoundPhysics.afterAlSourcePlay(source, spra$playPosition, spra$playCategory, spra$playSound, spra$playContext);
     }
 
     @ModifyVariable(method = "linearAttenuation", at = @At("HEAD"), ordinal = 0, argsOnly = true)

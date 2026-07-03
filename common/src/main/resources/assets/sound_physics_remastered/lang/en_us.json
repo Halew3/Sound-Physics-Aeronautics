@@ -74,7 +74,7 @@
   "cloth_config.sound_physics_remastered.sound_physics_max_debug_rays_per_tick": "Max debug rays per tick",
   "cloth_config.sound_physics_remastered.sound_physics_max_debug_rays_per_tick.description": "Limits how many debug rays are queued in one tick. 0 disables throttling.",
   "cloth_config.sound_physics_remastered.sound_physics_impact_burst_dedupe_enabled": "Impact burst dedupe",
-  "cloth_config.sound_physics_remastered.sound_physics_impact_burst_dedupe_enabled.description": "Coalesces repeated same-sound same-position impact bursts for a few ticks.",
+  "cloth_config.sound_physics_remastered.sound_physics_impact_burst_dedupe_enabled.description": "Coalesces repeated same-sound same-position impact bursts for a few ticks. Disabled by default to protect block interaction reverb.",
   "cloth_config.sound_physics_remastered.sound_physics_impact_burst_dedupe_apply_to_tickable_sounds": "Dedupe tickable sounds",
   "cloth_config.sound_physics_remastered.sound_physics_impact_burst_dedupe_apply_to_tickable_sounds.description": "Allows impact burst dedupe to affect tickable or continuous sounds. Disabled by default to protect machinery loops.",
   "cloth_config.sound_physics_remastered.sound_physics_impact_burst_dedupe_radius": "Impact burst dedupe radius",

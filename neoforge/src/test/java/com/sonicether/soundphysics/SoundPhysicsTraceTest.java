@@ -42,6 +42,18 @@ class SoundPhysicsTraceTest {
         SoundPhysicsTrace.recordProcessingPath(SoundProcessingDeduper.ProcessingPath.SOUND_ENGINE_FALLBACK, 21, SOUND);
         SoundPhysicsTrace.recordProcessingPath(SoundProcessingDeduper.ProcessingPath.MOVING_SOUND_UPDATE, 21, SOUND);
         SoundPhysicsTrace.recordDuplicateProcessingSkip(SoundProcessingDeduper.ProcessingPath.SOUND_ENGINE_FALLBACK, 21, SOUND);
+        SoundPhysicsTrace.recordSoundEngineFallbackSkippedRecentSourceMixin(21, SOUND);
+        SoundPhysicsTrace.recordSourceBlockSelfOcclusionApplied();
+        SoundPhysicsTrace.recordSourceBlockSelfOcclusionSkippedBlockSound();
+        SoundPhysicsTrace.recordSourceBlockSelfOcclusionSkippedStepOrBlockEvent();
+        SoundPhysicsTrace.recordSourceBlockSelfOcclusionSkippedBoundary();
+        SoundPhysicsTrace.recordPreplayRawFilterWarning();
+        SoundPhysicsTrace.recordPreplayFallbackApplied();
+        SoundPhysicsTrace.recordPreplayFallbackSkippedNoSnapshot();
+        SoundPhysicsTrace.recordSourceFilterReadbackBeforePlay(true, false);
+        SoundPhysicsTrace.recordSourceFilterReadbackBeforePlay(false, true);
+        SoundPhysicsTrace.recordOverloadFallbackReadback(true, false);
+        SoundPhysicsTrace.recordOverloadFallbackReadback(false, true);
 
         String summary = SoundPhysicsTrace.diagnosticsSummaryText();
         assertTrue(summary.contains("soundEnginePlayHead=1"));
@@ -51,13 +63,27 @@ class SoundPhysicsTraceTest {
         assertTrue(summary.contains("channelSetSelfPosition=1"));
         assertTrue(summary.contains("processPaths(sourceMixin=1, soundEngineFallback=1, movingSoundUpdate=1"));
         assertTrue(summary.contains("duplicateSkips(total=1"));
+        assertTrue(summary.contains("soundEngineFallbackSkippedRecentSourceMixin=1"));
+        assertTrue(summary.contains("sourceBlockSelfOcclusion(applied=1, skippedBlockSound=1, skippedStepOrBlockEvent=1, skippedBoundary=1)"));
+        assertTrue(summary.contains("preplayRawFilterWarnings=1"));
+        assertTrue(summary.contains("preplayFallbackApplied=1"));
+        assertTrue(summary.contains("preplayFallbackSkippedNoSnapshot=1"));
+        assertTrue(summary.contains("sourceFilterReadbackRawBeforePlay=1"));
+        assertTrue(summary.contains("sourceFilterReadbackMuffledBeforePlay=1"));
+        assertTrue(summary.contains("overloadFallbackReadbackRaw=1"));
+        assertTrue(summary.contains("overloadFallbackReadbackMuffled=1"));
 
         SoundPhysicsTrace.reset();
         String resetSummary = SoundPhysicsTrace.diagnosticsSummaryText();
         assertTrue(resetSummary.contains("soundEnginePlayHead=0"));
         assertTrue(resetSummary.contains("processPaths(sourceMixin=0, soundEngineFallback=0, movingSoundUpdate=0"));
         assertTrue(resetSummary.contains("duplicateSkips(total=0"));
+        assertTrue(resetSummary.contains("soundEngineFallbackSkippedRecentSourceMixin=0"));
         assertTrue(resetSummary.contains("sourceContextMismatches=0"));
+        assertTrue(resetSummary.contains("sourceBlockSelfOcclusion(applied=0, skippedBlockSound=0, skippedStepOrBlockEvent=0, skippedBoundary=0)"));
+        assertTrue(resetSummary.contains("preplayRawFilterWarnings=0"));
+        assertTrue(resetSummary.contains("sourceFilterReadbackRawBeforePlay=0"));
+        assertTrue(resetSummary.contains("overloadFallbackReadbackMuffled=0"));
     }
 
     @Test

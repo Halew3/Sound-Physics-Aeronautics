@@ -163,6 +163,7 @@ public final class ConfigDiagnostics {
         lines.add("sound_physics_impact_burst_dedupe_apply_to_tickable_sounds=" + config.soundPhysicsImpactBurstDedupeApplyToTickableSounds.get());
         lines.add("sound_physics_impact_burst_dedupe_radius=" + config.soundPhysicsImpactBurstDedupeRadius.get());
         lines.add("sound_physics_impact_burst_dedupe_ticks=" + config.soundPhysicsImpactBurstDedupeTicks.get());
+        lines.add("sound_physics_preplay_fallback_enabled=" + config.soundPhysicsPreplayFallbackEnabled.get());
         return lines;
     }
 
@@ -181,6 +182,7 @@ public final class ConfigDiagnostics {
                 + ", sound_physics_trace_logging=" + DiagnosticRuntimeOverrides.traceLoggingEnabled(config)
                 + ", openal_error_checks=" + DiagnosticRuntimeOverrides.openAlErrorChecksEnabled(config)
                 + ", adaptive_reflection_budget_enabled=" + config.adaptiveReflectionBudgetEnabled.get()
+                + ", sound_physics_preplay_fallback_enabled=" + config.soundPhysicsPreplayFallbackEnabled.get()
                 + ", sable_acoustics_enabled=" + DiagnosticRuntimeOverrides.sableAcousticsEnabled(config)
                 + ", force_root_acoustic_provider=" + DiagnosticRuntimeOverrides.forceRootAcousticProvider(config)
                 + ", doppler_enabled=" + DiagnosticRuntimeOverrides.dopplerEnabled(config)
