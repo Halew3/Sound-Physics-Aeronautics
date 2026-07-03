@@ -1,5 +1,6 @@
 package com.sonicether.soundphysics;
 
+import java.util.Arrays;
 import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -38,10 +39,14 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.phys.shapes.CollisionContext;
 
 public class SoundPhysics {
 
     private static final float PHI = 1.618033988F;
+    private static final double OCCLUSION_EPSILON = 1.0E-4D;
+    private static final double RAY_ORIGIN_ADVANCE_EPSILON = 1.0E-4D;
+    private static final int MIN_OPEN_VARIATION_SAMPLES_TO_OVERRIDE_BLOCKED_DIRECT = 3;
 
     private static final Pattern AMBIENT_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-\\.]+:ambient\\..*$");
     private static final Pattern BLOCK_PATTERN = Pattern.compile(".*block..*");
@@ -894,21 +899,34 @@ public class SoundPhysics {
                 variationFactor = Math.max(variationFactor, 0.49D);
             }
 
-            double occlusionAccMin = Double.MAX_VALUE;
-            occlusionAccMin = Math.min(occlusionAccMin, runOcclusion(scene, soundPos, playerPos));
+            double directOcclusion = runOcclusion(scene, soundPos, playerPos);
 
+            if (directOcclusion <= OCCLUSION_EPSILON) {
+                NonStrictOcclusionSelection selection = selectNonStrictOcclusion(directOcclusion, new double[0]);
+                SoundPhysicsTrace.recordNonStrictSelectedDirect();
+                logNonStrictOcclusionDecision(sound, category, directOcclusion, selection.selectedOcclusion(), new double[0], selection, variationFactor);
+                return 0.0D;
+            }
+
+            double[] variationSamples = variationFactor > 0D ? new double[8] : new double[0];
+            int sampleIndex = 0;
             if (variationFactor > 0D) {
                 for (int x = -1; x <= 1; x += 2) {
                     for (int y = -1; y <= 1; y += 2) {
                         for (int z = -1; z <= 1; z += 2) {
                             Vec3 offset = new Vec3(x, y, z).scale(variationFactor);
-                            occlusionAccMin = Math.min(occlusionAccMin, runOcclusion(scene, soundPos.add(offset), playerPos.add(offset)));
+                            variationSamples[sampleIndex] = runOcclusion(scene, soundPos.add(offset), playerPos);
+                            sampleIndex++;
                         }
                     }
                 }
             }
 
-            return Math.min(occlusionAccMin, SoundPhysicsMod.CONFIG.maxOcclusion.get());
+            NonStrictOcclusionSelection selection = selectNonStrictOcclusion(directOcclusion, variationSamples);
+            recordNonStrictOcclusionSelection(selection);
+            double selectedOcclusion = Math.min(selection.selectedOcclusion(), SoundPhysicsMod.CONFIG.maxOcclusion.get());
+            logNonStrictOcclusionDecision(sound, category, directOcclusion, selectedOcclusion, variationSamples, selection, variationFactor);
+            return selectedOcclusion;
         } finally {
             SoundPhysicsPerfDiagnostics.recordCalculateOcclusion(System.nanoTime() - startNanos);
         }
@@ -921,7 +939,8 @@ public class SoundPhysics {
             double occlusionAccumulation = 0D;
             Vec3 rayOrigin = soundPos;
 
-            AcousticBlockRef lastBlock = scene.blockAt(soundPos);
+            AcousticBlockRef sourceBlock = scene.blockAt(soundPos);
+            AcousticBlockRef lastBlock = shouldIgnoreSourceBlock(sourceBlock) ? sourceBlock : null;
 
             for (int i = 0; i < SoundPhysicsMod.CONFIG.maxOcclusionRays.get(); i++) {
                 AcousticRayHit rayHit = scene.rayCast(rayOrigin, playerPos, lastBlock);
@@ -936,6 +955,8 @@ public class SoundPhysics {
                 RaycastRenderer.addOcclusionRay(rayOrigin, rayHit.worldLocation(), Mth.hsvToRgb(1F / 3F * (1F - Math.min(1F, (float) occlusionAccumulation / 12F)), 1F, 1F));
 
                 AcousticBlockRef blockRef = rayHit.blockRef();
+                Vec3 hitLocation = rayHit.worldLocation();
+                boolean samePositionHit = rayOrigin.distanceToSqr(hitLocation) <= RAY_ORIGIN_ADVANCE_EPSILON * RAY_ORIGIN_ADVANCE_EPSILON;
                 rayOrigin = rayHit.worldLocation();
 
                 BlockState blockHit = blockRef.blockState();
@@ -959,12 +980,111 @@ public class SoundPhysics {
                     Loggers.logOcclusion("Max occlusion reached after {} steps", i + 1);
                     break;
                 }
+
+                if (samePositionHit) {
+                    Vec3 toPlayer = playerPos.subtract(rayOrigin);
+                    if (toPlayer.lengthSqr() > 1.0E-12D) {
+                        rayOrigin = rayOrigin.add(toPlayer.normalize().scale(RAY_ORIGIN_ADVANCE_EPSILON));
+                    }
+                }
             }
 
             return occlusionAccumulation;
         } finally {
             SoundPhysicsPerfDiagnostics.recordRunOcclusion(System.nanoTime() - startNanos);
         }
+    }
+
+    static NonStrictOcclusionSelection selectNonStrictOcclusion(double directOcclusion, double[] variationSamples) {
+        int zeroSamples = 0;
+        int positiveVariationSamples = 0;
+        double[] positiveSamples = new double[variationSamples.length + 1];
+
+        if (directOcclusion <= OCCLUSION_EPSILON) {
+            return new NonStrictOcclusionSelection(0.0D, 0, 0, "direct_open");
+        }
+
+        positiveSamples[0] = directOcclusion;
+        int positiveSamplesIncludingDirect = 1;
+
+        for (double sample : variationSamples) {
+            if (sample <= OCCLUSION_EPSILON) {
+                zeroSamples++;
+                continue;
+            }
+            positiveSamples[positiveSamplesIncludingDirect] = sample;
+            positiveSamplesIncludingDirect++;
+            positiveVariationSamples++;
+        }
+
+        if (zeroSamples >= MIN_OPEN_VARIATION_SAMPLES_TO_OVERRIDE_BLOCKED_DIRECT) {
+            return new NonStrictOcclusionSelection(0.0D, zeroSamples, positiveVariationSamples, "zero_override");
+        }
+
+        Arrays.sort(positiveSamples, 0, positiveSamplesIncludingDirect);
+        double median = medianSorted(positiveSamples, positiveSamplesIncludingDirect);
+        double selectedOcclusion = Math.min(directOcclusion, median);
+        String decisionKind = selectedOcclusion == directOcclusion ? "direct" : "median_positive";
+        return new NonStrictOcclusionSelection(selectedOcclusion, zeroSamples, positiveVariationSamples, decisionKind);
+    }
+
+    static boolean shouldIgnoreSourceBlock(AcousticBlockRef sourceBlock) {
+        BlockState sourceBlockState = sourceBlock.blockState();
+        if (sourceBlockState.isAir()) {
+            return true;
+        }
+        boolean emptyCollision = sourceBlockState.getCollisionShape(sourceBlock.space(), sourceBlock.pos(), CollisionContext.empty()).isEmpty();
+        FluidState sourceFluidState = sourceBlock.fluidState();
+        if (!sourceFluidState.isEmpty() && emptyCollision) {
+            return true;
+        }
+        if (emptyCollision) {
+            return true;
+        }
+        if (SoundPhysicsMod.OCCLUSION_CONFIG == null) {
+            return false;
+        }
+        return SoundPhysicsMod.OCCLUSION_CONFIG.getBlockDefinitionValue(sourceBlockState) <= OCCLUSION_EPSILON;
+    }
+
+    private static void recordNonStrictOcclusionSelection(NonStrictOcclusionSelection selection) {
+        if (selection.zeroSamples() >= MIN_OPEN_VARIATION_SAMPLES_TO_OVERRIDE_BLOCKED_DIRECT) {
+            SoundPhysicsTrace.recordNonStrictZeroOutlierAccepted(selection.zeroSamples());
+        } else if (selection.zeroSamples() > 0) {
+            SoundPhysicsTrace.recordNonStrictZeroOutlierIgnored(selection.zeroSamples());
+        }
+
+        if ("direct".equals(selection.decisionKind()) || "direct_open".equals(selection.decisionKind())) {
+            SoundPhysicsTrace.recordNonStrictSelectedDirect();
+        } else if ("median_positive".equals(selection.decisionKind())) {
+            SoundPhysicsTrace.recordNonStrictSelectedMedianOrPositive();
+        }
+    }
+
+    private static void logNonStrictOcclusionDecision(@Nullable ResourceLocation sound, @Nullable SoundSource category, double directOcclusion, double selectedOcclusion, double[] variationSamples, NonStrictOcclusionSelection selection, double variationFactor) {
+        Loggers.logOcclusion(
+                "Non-strict occlusion sound={} category={} direct={} selected={} samples={} zeroSamples={} positiveSamples={} strict=false variation={} decision={}",
+                sound,
+                category,
+                directOcclusion,
+                selectedOcclusion,
+                Arrays.toString(variationSamples),
+                selection.zeroSamples(),
+                selection.positiveSamples(),
+                variationFactor,
+                selection.decisionKind()
+        );
+    }
+
+    private static double medianSorted(double[] sortedValues, int count) {
+        int midpoint = count / 2;
+        if (count % 2 == 1) {
+            return sortedValues[midpoint];
+        }
+        return (sortedValues[midpoint - 1] + sortedValues[midpoint]) * 0.5D;
+    }
+
+    static record NonStrictOcclusionSelection(double selectedOcclusion, int zeroSamples, int positiveSamples, String decisionKind) {
     }
 
     /**

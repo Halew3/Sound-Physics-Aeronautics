@@ -45,4 +45,25 @@ class SoundPhysicsTraceTest {
         assertTrue(resetSummary.contains("duplicateSkips(total=0"));
     }
 
+    @Test
+    void nonStrictOcclusionCountersSummarizeAndReset() {
+        SoundPhysicsTrace.recordNonStrictZeroOutlierIgnored(2);
+        SoundPhysicsTrace.recordNonStrictZeroOutlierAccepted(3);
+        SoundPhysicsTrace.recordNonStrictSelectedDirect();
+        SoundPhysicsTrace.recordNonStrictSelectedMedianOrPositive();
+
+        String summary = SoundPhysicsTrace.diagnosticsSummaryText();
+        assertTrue(summary.contains("nonStrictZeroOutlierIgnored=2"));
+        assertTrue(summary.contains("nonStrictZeroOutlierAccepted=3"));
+        assertTrue(summary.contains("nonStrictSelectedDirect=1"));
+        assertTrue(summary.contains("nonStrictSelectedMedianOrPositive=1"));
+
+        SoundPhysicsTrace.reset();
+        String resetSummary = SoundPhysicsTrace.diagnosticsSummaryText();
+        assertTrue(resetSummary.contains("nonStrictZeroOutlierIgnored=0"));
+        assertTrue(resetSummary.contains("nonStrictZeroOutlierAccepted=0"));
+        assertTrue(resetSummary.contains("nonStrictSelectedDirect=0"));
+        assertTrue(resetSummary.contains("nonStrictSelectedMedianOrPositive=0"));
+    }
+
 }

@@ -25,6 +25,10 @@ public final class SoundPhysicsTrace {
     private static final AtomicLong acousticProviderFailures = new AtomicLong();
     private static final AtomicLong calculateOcclusionCalls = new AtomicLong();
     private static final AtomicLong runOcclusionCalls = new AtomicLong();
+    private static final AtomicLong nonStrictZeroOutlierIgnored = new AtomicLong();
+    private static final AtomicLong nonStrictZeroOutlierAccepted = new AtomicLong();
+    private static final AtomicLong nonStrictSelectedDirect = new AtomicLong();
+    private static final AtomicLong nonStrictSelectedMedianOrPositive = new AtomicLong();
     private static final AtomicLong rootRayHits = new AtomicLong();
     private static final AtomicLong rootRayMisses = new AtomicLong();
     private static final AtomicLong sableRayHits = new AtomicLong();
@@ -183,6 +187,28 @@ public final class SoundPhysicsTrace {
         Loggers.logTrace("runOcclusion called soundPos={} playerPos={}", soundPos, playerPos);
     }
 
+    public static void recordNonStrictZeroOutlierIgnored(int count) {
+        if (count <= 0) {
+            return;
+        }
+        nonStrictZeroOutlierIgnored.addAndGet(count);
+    }
+
+    public static void recordNonStrictZeroOutlierAccepted(int count) {
+        if (count <= 0) {
+            return;
+        }
+        nonStrictZeroOutlierAccepted.addAndGet(count);
+    }
+
+    public static void recordNonStrictSelectedDirect() {
+        nonStrictSelectedDirect.incrementAndGet();
+    }
+
+    public static void recordNonStrictSelectedMedianOrPositive() {
+        nonStrictSelectedMedianOrPositive.incrementAndGet();
+    }
+
     public static void recordRootRay(HitResult.Type type, Vec3 from, Vec3 to, Vec3 hitLocation) {
         boolean hit = type == HitResult.Type.BLOCK;
         if (hit) {
@@ -239,6 +265,10 @@ public final class SoundPhysicsTrace {
                 + ", providerFailures=" + acousticProviderFailures.get() + ")"
                 + ", calculateOcclusion=" + calculateOcclusionCalls.get()
                 + ", runOcclusion=" + runOcclusionCalls.get()
+                + ", nonStrictOcclusion(nonStrictZeroOutlierIgnored=" + nonStrictZeroOutlierIgnored.get()
+                + ", nonStrictZeroOutlierAccepted=" + nonStrictZeroOutlierAccepted.get()
+                + ", nonStrictSelectedDirect=" + nonStrictSelectedDirect.get()
+                + ", nonStrictSelectedMedianOrPositive=" + nonStrictSelectedMedianOrPositive.get() + ")"
                 + ", rootRays(hit=" + rootRayHits.get() + ", miss=" + rootRayMisses.get() + ")"
                 + ", sableRays(hit=" + sableRayHits.get() + ", miss=" + sableRayMisses.get() + ", failures=" + sableRayFailures.get() + ")";
     }
@@ -258,6 +288,10 @@ public final class SoundPhysicsTrace {
         acousticProviderFailures.set(0L);
         calculateOcclusionCalls.set(0L);
         runOcclusionCalls.set(0L);
+        nonStrictZeroOutlierIgnored.set(0L);
+        nonStrictZeroOutlierAccepted.set(0L);
+        nonStrictSelectedDirect.set(0L);
+        nonStrictSelectedMedianOrPositive.set(0L);
         rootRayHits.set(0L);
         rootRayMisses.set(0L);
         sableRayHits.set(0L);
