@@ -46,12 +46,19 @@ final class NeoForgeSoundSourceEvents {
             return;
         }
 
+        Vec3 sourcePosition = new Vec3(sound.getX(), sound.getY(), sound.getZ());
+        if (SoundProcessingDeduper.wasRecentlyProcessedBySourceMixin(sourceId, soundId, category, sourcePosition, System.nanoTime())) {
+            SoundPhysicsTrace.recordDuplicateProcessingSkip(SoundProcessingDeduper.ProcessingPath.SOUND_ENGINE_FALLBACK, sourceId, soundId);
+            SoundPhysicsTrace.recordSoundEngineFallbackSkippedRecentSourceMixin(sourceId, soundId);
+            SoundPhysicsPerfDiagnostics.recordProcessSound(System.nanoTime() - startNanos);
+            return;
+        }
+
         long gameTime = SoundProcessingDeduper.currentGameTime();
         if (!SoundProcessingDeduper.shouldProcessStart(sourceId, gameTime, category, soundId, SoundProcessingDeduper.ProcessingPath.SOUND_ENGINE_FALLBACK)) {
             return;
         }
 
-        Vec3 sourcePosition = new Vec3(sound.getX(), sound.getY(), sound.getZ());
         SoundPhysicsSoundPolicy.SoundContext context = new SoundPhysicsSoundPolicy.SoundContext(soundId, category, soundInstanceClassName, relative, noAttenuation, streaming, true, tickable);
         if (SoundPhysicsSoundPolicy.isKnownPropeller(context)) {
             PropellerLongRangeAudio.applySourceRange(sourceId, sound, context, sound.getPitch(), sound.getVolume());

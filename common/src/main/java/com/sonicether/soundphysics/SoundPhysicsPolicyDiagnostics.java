@@ -24,6 +24,14 @@ public final class SoundPhysicsPolicyDiagnostics {
     private static final AtomicLong environmentResetSkips = new AtomicLong();
     private static final AtomicLong environmentUntouchedSkips = new AtomicLong();
     private static final AtomicLong processedNormally = new AtomicLong();
+    private static final AtomicLong overloadFallbackNearestApplied = new AtomicLong();
+    private static final AtomicLong overloadFallbackDirectOnlyApplied = new AtomicLong();
+    private static final AtomicLong overloadFallbackFailed = new AtomicLong();
+    private static final AtomicLong overloadUntouchedSkipped = new AtomicLong();
+    private static final AtomicLong overloadFallbackPreservedExistingEnvironment = new AtomicLong();
+    private static final AtomicLong blockEventDirectOnlyLastResort = new AtomicLong();
+    private static final AtomicLong blockEventDirectOnlyFallbackApplied = new AtomicLong();
+    private static final AtomicLong duplicateFallbackWouldOverwriteReverb = new AtomicLong();
     private static final AtomicLong propellerSeen = new AtomicLong();
     private static final AtomicLong propellerStartEventSeen = new AtomicLong();
     private static final AtomicLong propellerMovingUpdateSeen = new AtomicLong();
@@ -104,6 +112,35 @@ public final class SoundPhysicsPolicyDiagnostics {
             propellerEnvironmentUntouched.incrementAndGet();
             propellerSkippedButUntouched.incrementAndGet();
         }
+    }
+
+    public static void recordOverloadFallbackNearestApplied() {
+        overloadFallbackNearestApplied.incrementAndGet();
+    }
+
+    public static void recordOverloadFallbackDirectOnlyApplied() {
+        overloadFallbackDirectOnlyApplied.incrementAndGet();
+    }
+
+    public static void recordOverloadFallbackFailed() {
+        overloadFallbackFailed.incrementAndGet();
+        overloadUntouchedSkipped.incrementAndGet();
+    }
+
+    public static void recordOverloadFallbackPreservedExistingEnvironment() {
+        overloadFallbackPreservedExistingEnvironment.incrementAndGet();
+    }
+
+    public static void recordBlockEventDirectOnlyLastResort() {
+        blockEventDirectOnlyLastResort.incrementAndGet();
+    }
+
+    public static void recordBlockEventDirectOnlyFallbackApplied() {
+        blockEventDirectOnlyFallbackApplied.incrementAndGet();
+    }
+
+    public static void recordDuplicateFallbackWouldOverwriteReverb() {
+        duplicateFallbackWouldOverwriteReverb.incrementAndGet();
     }
 
     public static void recordProcessedNormally(SoundPhysicsSoundPolicy.SoundContext context) {
@@ -245,6 +282,14 @@ public final class SoundPhysicsPolicyDiagnostics {
                 + ", env(resetSkips=" + environmentResetSkips.get()
                 + ", untouchedSkips=" + environmentUntouchedSkips.get()
                 + ", processed=" + processedNormally.get() + ")"
+                + ", overloadFallback(nearestApplied=" + overloadFallbackNearestApplied.get()
+                + ", directOnlyApplied=" + overloadFallbackDirectOnlyApplied.get()
+                + ", failed=" + overloadFallbackFailed.get()
+                + ", untouchedSkipped=" + overloadUntouchedSkipped.get() + ")"
+                + ", overloadFallbackGuards(preservedExistingEnvironment=" + overloadFallbackPreservedExistingEnvironment.get()
+                + ", blockEventDirectOnlyLastResort=" + blockEventDirectOnlyLastResort.get()
+                + ", blockEventDirectOnlyFallbackApplied=" + blockEventDirectOnlyFallbackApplied.get()
+                + ", duplicateFallbackWouldOverwriteReverb=" + duplicateFallbackWouldOverwriteReverb.get() + ")"
                 + ", propeller(seen=" + propellerSeen.get()
                 + ", start=" + propellerStartEventSeen.get()
                 + ", moving=" + propellerMovingUpdateSeen.get()
@@ -304,6 +349,14 @@ public final class SoundPhysicsPolicyDiagnostics {
         environmentResetSkips.set(0L);
         environmentUntouchedSkips.set(0L);
         processedNormally.set(0L);
+        overloadFallbackNearestApplied.set(0L);
+        overloadFallbackDirectOnlyApplied.set(0L);
+        overloadFallbackFailed.set(0L);
+        overloadUntouchedSkipped.set(0L);
+        overloadFallbackPreservedExistingEnvironment.set(0L);
+        blockEventDirectOnlyLastResort.set(0L);
+        blockEventDirectOnlyFallbackApplied.set(0L);
+        duplicateFallbackWouldOverwriteReverb.set(0L);
         propellerSeen.set(0L);
         propellerStartEventSeen.set(0L);
         propellerMovingUpdateSeen.set(0L);

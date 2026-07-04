@@ -109,6 +109,14 @@ final class SableAcousticScene implements AcousticScene {
         return new AcousticBlockRef(rootSpace, BlockPos.containing(worldPosition));
     }
 
+    @Override
+    public Vec3 toLocalPosition(AcousticBlockRef blockRef, Vec3 worldPosition) {
+        if (blockRef.space() instanceof SableAcousticSpace space) {
+            return space.toLocal(worldPosition);
+        }
+        return worldPosition;
+    }
+
     private List<SableAcousticSpace> candidatesFor(Vec3 from, Vec3 to) {
         diagnostics.recordCandidateQuery();
         RayCandidateKey key = RayCandidateKey.create(from, to);

@@ -129,6 +129,7 @@ public class SoundPhysicsConfig {
     public final ConfigEntry<Boolean> soundPhysicsImpactBurstDedupeApplyToTickableSounds;
     public final ConfigEntry<Double> soundPhysicsImpactBurstDedupeRadius;
     public final ConfigEntry<Integer> soundPhysicsImpactBurstDedupeTicks;
+    public final ConfigEntry<Boolean> soundPhysicsPreplayFallbackEnabled;
     public final ConfigEntry<Boolean> unsafeLevelAccess;
     public final ConfigEntry<Integer> levelCloneRange;
     public final ConfigEntry<Integer> levelCloneMaxRetainTicks;
@@ -445,14 +446,19 @@ public class SoundPhysicsConfig {
                 .comment("Maximum acoustic sound starts processed per tick. 0 disables throttling.");
         soundPhysicsMaxDebugRaysPerTick = builder.integerEntry("sound_physics_max_debug_rays_per_tick", 4096, 0, Integer.MAX_VALUE)
                 .comment("Maximum debug rays queued per tick. 0 disables throttling.");
-        soundPhysicsImpactBurstDedupeEnabled = builder.booleanEntry("sound_physics_impact_burst_dedupe_enabled", true)
-                .comment("Coalesce repeated same-sound same-position impact bursts for a few ticks.");
+        soundPhysicsImpactBurstDedupeEnabled = builder.booleanEntry("sound_physics_impact_burst_dedupe_enabled", false)
+                .comment("Coalesce repeated same-sound same-position impact bursts for a few ticks. Disabled by default to avoid suppressing room reverb on block interaction sounds.");
         soundPhysicsImpactBurstDedupeApplyToTickableSounds = builder.booleanEntry("sound_physics_impact_burst_dedupe_apply_to_tickable_sounds", false)
                 .comment("Apply impact burst dedupe to tickable/continuous sounds. Disabled by default so machinery loops are not suppressed.");
         soundPhysicsImpactBurstDedupeRadius = builder.doubleEntry("sound_physics_impact_burst_dedupe_radius", 1.5D, 0.1D, 32.0D)
                 .comment("Position radius used by impact burst dedupe.");
         soundPhysicsImpactBurstDedupeTicks = builder.integerEntry("sound_physics_impact_burst_dedupe_ticks", 2, 0, 40)
                 .comment("Tick window used by impact burst dedupe. 0 disables the tick window.");
+        soundPhysicsPreplayFallbackEnabled = builder.booleanEntry("sound_physics_preplay_fallback_enabled", false)
+                .comment(
+                        "Diagnostic-only startup fallback for chicken leak debugging.",
+                        "Disabled by default because OpenAL direct-filter readback is not reliable enough to drive gameplay behavior."
+                );
         unsafeLevelAccess = builder.booleanEntry("unsafe_level_access", false)
                 .comment(
                         "Disable level clone and cache. This will fall back to original main thread access.",

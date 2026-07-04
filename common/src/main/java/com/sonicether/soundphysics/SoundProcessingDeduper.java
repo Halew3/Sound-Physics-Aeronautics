@@ -14,6 +14,10 @@ import net.minecraft.world.phys.Vec3;
 public final class SoundProcessingDeduper {
 
     private static final int MAX_KEYS = 2048;
+    static final long RECENT_SOURCE_MIXIN_START_WINDOW_NANOS = 250_000_000L;
+    static final double RECENT_SOURCE_MIXIN_START_POSITION_TOLERANCE = 1.0D / 32.0D;
+    private static final double RECENT_SOURCE_MIXIN_START_POSITION_TOLERANCE_SQR =
+            RECENT_SOURCE_MIXIN_START_POSITION_TOLERANCE * RECENT_SOURCE_MIXIN_START_POSITION_TOLERANCE;
     private static final Map<Key, Boolean> PROCESSED = new LinkedHashMap<>() {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Key, Boolean> eldest) {
@@ -23,6 +27,12 @@ public final class SoundProcessingDeduper {
     private static final Map<ImpactBurstKey, Long> IMPACT_BURSTS = new LinkedHashMap<>() {
         @Override
         protected boolean removeEldestEntry(Map.Entry<ImpactBurstKey, Long> eldest) {
+            return size() > MAX_KEYS;
+        }
+    };
+    private static final Map<RecentSourceMixinStartKey, RecentSourceMixinStart> RECENT_SOURCE_MIXIN_STARTS = new LinkedHashMap<>() {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<RecentSourceMixinStartKey, RecentSourceMixinStart> eldest) {
             return size() > MAX_KEYS;
         }
     };
@@ -55,6 +65,39 @@ public final class SoundProcessingDeduper {
         }
     }
 
+    public static void recordSourceMixinStartProcessed(
+            int sourceId,
+            @Nullable ResourceLocation sound,
+            @Nullable SoundSource category,
+            Vec3 position,
+            long nowNanos
+    ) {
+        RecentSourceMixinStart start = new RecentSourceMixinStart(sourceId, sound, category, position, nowNanos);
+        RecentSourceMixinStartKey key = RecentSourceMixinStartKey.create(sourceId, sound, category, position);
+        synchronized (RECENT_SOURCE_MIXIN_STARTS) {
+            pruneRecentSourceMixinStarts(nowNanos);
+            RECENT_SOURCE_MIXIN_STARTS.put(key, start);
+        }
+    }
+
+    public static boolean wasRecentlyProcessedBySourceMixin(
+            int sourceId,
+            @Nullable ResourceLocation sound,
+            @Nullable SoundSource category,
+            Vec3 position,
+            long nowNanos
+    ) {
+        synchronized (RECENT_SOURCE_MIXIN_STARTS) {
+            pruneRecentSourceMixinStarts(nowNanos);
+            for (RecentSourceMixinStart start : RECENT_SOURCE_MIXIN_STARTS.values()) {
+                if (start.matches(sourceId, sound, category, position, nowNanos)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     public static long currentGameTime() {
         Minecraft client = Minecraft.getInstance();
         return client.level == null ? Long.MIN_VALUE : client.level.getGameTime();
@@ -66,6 +109,9 @@ public final class SoundProcessingDeduper {
         }
         synchronized (IMPACT_BURSTS) {
             IMPACT_BURSTS.clear();
+        }
+        synchronized (RECENT_SOURCE_MIXIN_STARTS) {
+            RECENT_SOURCE_MIXIN_STARTS.clear();
         }
     }
 
@@ -131,6 +177,64 @@ public final class SoundProcessingDeduper {
                     Math.round(position.z / safeRadius)
             );
         }
+    }
+
+    private record RecentSourceMixinStartKey(
+            int sourceId,
+            @Nullable ResourceLocation sound,
+            @Nullable SoundSource category,
+            long x,
+            long y,
+            long z
+    ) {
+        static RecentSourceMixinStartKey create(
+                int sourceId,
+                @Nullable ResourceLocation sound,
+                @Nullable SoundSource category,
+                Vec3 position
+        ) {
+            return new RecentSourceMixinStartKey(
+                    sourceId,
+                    sound,
+                    category,
+                    Math.round(position.x / RECENT_SOURCE_MIXIN_START_POSITION_TOLERANCE),
+                    Math.round(position.y / RECENT_SOURCE_MIXIN_START_POSITION_TOLERANCE),
+                    Math.round(position.z / RECENT_SOURCE_MIXIN_START_POSITION_TOLERANCE)
+            );
+        }
+    }
+
+    private record RecentSourceMixinStart(
+            int sourceId,
+            @Nullable ResourceLocation sound,
+            @Nullable SoundSource category,
+            Vec3 position,
+            long createdNanos
+    ) {
+        boolean matches(
+                int requestedSourceId,
+                @Nullable ResourceLocation requestedSound,
+                @Nullable SoundSource requestedCategory,
+                Vec3 requestedPosition,
+                long nowNanos
+        ) {
+            if (!fresh(nowNanos)) {
+                return false;
+            }
+            return sourceId == requestedSourceId
+                    && category == requestedCategory
+                    && Objects.equals(sound, requestedSound)
+                    && position.distanceToSqr(requestedPosition) <= RECENT_SOURCE_MIXIN_START_POSITION_TOLERANCE_SQR;
+        }
+
+        boolean fresh(long nowNanos) {
+            long age = nowNanos - createdNanos;
+            return age >= 0L && age <= RECENT_SOURCE_MIXIN_START_WINDOW_NANOS;
+        }
+    }
+
+    private static void pruneRecentSourceMixinStarts(long nowNanos) {
+        RECENT_SOURCE_MIXIN_STARTS.entrySet().removeIf(entry -> !entry.getValue().fresh(nowNanos));
     }
 
 }

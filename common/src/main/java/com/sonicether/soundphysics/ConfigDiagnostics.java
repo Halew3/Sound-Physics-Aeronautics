@@ -25,6 +25,7 @@ public final class ConfigDiagnostics {
     public static List<String> configPathLines(Path gameDirectory, Path configFolder) {
         Path soundPhysicsConfigPath = soundPhysicsConfigPath(configFolder);
         List<String> lines = new ArrayList<>();
+        lines.add("SPRA_PATCH_ID=" + SoundPhysicsMod.SPRA_PATCH_ID);
         lines.add("Game directory: " + gameDirectory.toAbsolutePath());
         lines.add("Config folder: " + configFolder.toAbsolutePath());
         lines.add("Sound Physics config folder: " + configDirectory(configFolder).toAbsolutePath());
@@ -162,16 +163,18 @@ public final class ConfigDiagnostics {
         lines.add("sound_physics_impact_burst_dedupe_apply_to_tickable_sounds=" + config.soundPhysicsImpactBurstDedupeApplyToTickableSounds.get());
         lines.add("sound_physics_impact_burst_dedupe_radius=" + config.soundPhysicsImpactBurstDedupeRadius.get());
         lines.add("sound_physics_impact_burst_dedupe_ticks=" + config.soundPhysicsImpactBurstDedupeTicks.get());
+        lines.add("sound_physics_preplay_fallback_enabled=" + config.soundPhysicsPreplayFallbackEnabled.get());
         return lines;
     }
 
     public static String criticalValuesSummary() {
         SoundPhysicsConfig config = SoundPhysicsMod.CONFIG;
         if (config == null) {
-            return "mode=" + DiagnosticRuntimeOverrides.mode().commandName() + ", config=not_initialized";
+            return "SPRA_PATCH_ID=" + SoundPhysicsMod.SPRA_PATCH_ID + ", mode=" + DiagnosticRuntimeOverrides.mode().commandName() + ", config=not_initialized";
         }
 
-        return "mode=" + DiagnosticRuntimeOverrides.mode().commandName()
+        return "SPRA_PATCH_ID=" + SoundPhysicsMod.SPRA_PATCH_ID
+                + ", mode=" + DiagnosticRuntimeOverrides.mode().commandName()
                 + ", enabled=" + DiagnosticRuntimeOverrides.soundPhysicsEnabled(config)
                 + ", render_occlusion=" + DiagnosticRuntimeOverrides.renderOcclusion(config)
                 + ", render_sound_bounces=" + DiagnosticRuntimeOverrides.renderSoundBounces(config)
@@ -179,6 +182,7 @@ public final class ConfigDiagnostics {
                 + ", sound_physics_trace_logging=" + DiagnosticRuntimeOverrides.traceLoggingEnabled(config)
                 + ", openal_error_checks=" + DiagnosticRuntimeOverrides.openAlErrorChecksEnabled(config)
                 + ", adaptive_reflection_budget_enabled=" + config.adaptiveReflectionBudgetEnabled.get()
+                + ", sound_physics_preplay_fallback_enabled=" + config.soundPhysicsPreplayFallbackEnabled.get()
                 + ", sable_acoustics_enabled=" + DiagnosticRuntimeOverrides.sableAcousticsEnabled(config)
                 + ", force_root_acoustic_provider=" + DiagnosticRuntimeOverrides.forceRootAcousticProvider(config)
                 + ", doppler_enabled=" + DiagnosticRuntimeOverrides.dopplerEnabled(config)

@@ -18,6 +18,9 @@ import org.junit.jupiter.api.io.TempDir;
 class SoundProcessingDeduperTest {
 
     private static final ResourceLocation SOUND = ResourceLocation.fromNamespaceAndPath("minecraft", "block.note_block.pling");
+    private static final ResourceLocation STONE_PLACE = ResourceLocation.fromNamespaceAndPath("minecraft", "block.stone.place");
+    private static final ResourceLocation STONE_BREAK = ResourceLocation.fromNamespaceAndPath("minecraft", "block.stone.break");
+    private static final Vec3 SOURCE_POS = new Vec3(-85.5D, 74.5D, -487.5D);
 
     @TempDir
     Path tempDir;
@@ -59,6 +62,53 @@ class SoundProcessingDeduperTest {
         assertTrue(SoundProcessingDeduper.shouldProcessImpactBurst(104L, SoundSource.BLOCKS, SOUND, new Vec3(0D, 0D, 0D), 1.5D, 2));
 
         assertTrue(SoundPhysicsPerfDiagnostics.summaryText().contains("impactDeduped=1"));
+    }
+
+    @Test
+    void recentSourceMixinStartSkipsFallbackWithinWallClockWindow() {
+        long nowNanos = 1_000_000_000L;
+
+        SoundProcessingDeduper.recordSourceMixinStartProcessed(14, STONE_PLACE, SoundSource.BLOCKS, SOURCE_POS, nowNanos);
+
+        assertTrue(SoundProcessingDeduper.wasRecentlyProcessedBySourceMixin(
+                14,
+                STONE_PLACE,
+                SoundSource.BLOCKS,
+                SOURCE_POS.add(0.01D, 0.0D, 0.0D),
+                nowNanos + 100_000_000L
+        ));
+    }
+
+    @Test
+    void recentSourceMixinStartExpiresAfterWallClockWindow() {
+        long nowNanos = 1_000_000_000L;
+
+        SoundProcessingDeduper.recordSourceMixinStartProcessed(14, STONE_PLACE, SoundSource.BLOCKS, SOURCE_POS, nowNanos);
+
+        assertFalse(SoundProcessingDeduper.wasRecentlyProcessedBySourceMixin(
+                14,
+                STONE_PLACE,
+                SoundSource.BLOCKS,
+                SOURCE_POS,
+                nowNanos + SoundProcessingDeduper.RECENT_SOURCE_MIXIN_START_WINDOW_NANOS + 1L
+        ));
+    }
+
+    @Test
+    void recentSourceMixinStartDoesNotSkipDifferentSourceSoundOrFarPosition() {
+        long nowNanos = 1_000_000_000L;
+
+        SoundProcessingDeduper.recordSourceMixinStartProcessed(14, STONE_PLACE, SoundSource.BLOCKS, SOURCE_POS, nowNanos);
+
+        assertFalse(SoundProcessingDeduper.wasRecentlyProcessedBySourceMixin(15, STONE_PLACE, SoundSource.BLOCKS, SOURCE_POS, nowNanos + 10L));
+        assertFalse(SoundProcessingDeduper.wasRecentlyProcessedBySourceMixin(14, STONE_BREAK, SoundSource.BLOCKS, SOURCE_POS, nowNanos + 10L));
+        assertFalse(SoundProcessingDeduper.wasRecentlyProcessedBySourceMixin(
+                14,
+                STONE_PLACE,
+                SoundSource.BLOCKS,
+                SOURCE_POS.add(SoundProcessingDeduper.RECENT_SOURCE_MIXIN_START_POSITION_TOLERANCE + 0.01D, 0.0D, 0.0D),
+                nowNanos + 10L
+        ));
     }
 
     @Test

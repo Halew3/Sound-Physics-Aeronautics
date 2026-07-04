@@ -57,6 +57,7 @@ class ConfigDiagnosticsTest {
         assertTrue(joined.contains("sable_acoustics_enabled=true"));
         assertTrue(joined.contains("adaptive_reflection_budget_enabled=true"));
         assertTrue(joined.contains("doppler_enabled=true"));
+        assertTrue(joined.contains("sound_physics_preplay_fallback_enabled=false"));
     }
 
     @Test
@@ -91,7 +92,9 @@ class ConfigDiagnosticsTest {
         assertTrue(dump.contains("distant_horizons_far_propeller_max_ray_length=2048"));
         assertTrue(dump.contains("distant_horizons_far_propeller_debug_logging=false"));
         assertTrue(dump.contains("sound_physics_max_sound_starts_per_tick=32"));
+        assertTrue(dump.contains("sound_physics_impact_burst_dedupe_enabled=false"));
         assertTrue(dump.contains("sound_physics_impact_burst_dedupe_apply_to_tickable_sounds=false"));
+        assertTrue(dump.contains("sound_physics_preplay_fallback_enabled=false"));
 
         Path example = ConfigDiagnostics.exportExample(configFolder);
         String exampleText = Files.readString(example);
@@ -107,8 +110,11 @@ class ConfigDiagnosticsTest {
         assertTrue(exampleText.contains("propeller_far_field_skip_reverb_after_distance=384.0"));
         assertTrue(exampleText.contains("distant_horizons_far_propeller_occlusion_enabled=false"));
         assertTrue(exampleText.contains("distant_horizons_far_propeller_max_ray_length=2048"));
+        assertTrue(exampleText.contains("sound_physics_impact_burst_dedupe_enabled=false"));
+        assertTrue(exampleText.contains("sound_physics_preplay_fallback_enabled=false"));
         assertTrue(ConfigDiagnostics.criticalValuesSummary().contains("openal_error_checks=false"));
         assertTrue(ConfigDiagnostics.criticalValuesSummary().contains("adaptive_reflection_budget_enabled=true"));
+        assertTrue(ConfigDiagnostics.criticalValuesSummary().contains("sound_physics_preplay_fallback_enabled=false"));
         assertTrue(ConfigDiagnostics.criticalValuesSummary().contains("distant_horizons_far_propeller_occlusion_enabled=false"));
     }
 
